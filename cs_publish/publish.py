@@ -120,7 +120,7 @@ class Publisher:
         safeowner = clean(app["owner"])
         safetitle = clean(app["title"])
         img_name = f"{safeowner}_{safetitle}_tasks"
-        run(f"docker run {self.cr}/{self.project}/{img_name}:{self.tag} py.test /home/test_functions.py -v -s")
+        run(f"docker push {self.cr}/{self.project}/{img_name}:{self.tag}")
 
 
 if __name__ == "__main__":
