@@ -31,9 +31,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-    - name: Checkout
-      uses: actions/checkout@v2
-
     # Setup gcloud CLI
     - uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
       with:
@@ -50,23 +47,14 @@ jobs:
     # Build Docker images
     - name: Build
       run: |
-        python cs_publisher/publish.py --tag v$GITHUB_SHA --config worker_config.dev.yaml --build
+        python cs_publisher/publish.py --tag test --config worker_config.dev.yaml --build
 
     # Test Docker images
     - name: Test
       run: |
-        python cs_publisher/publish.py --tag v$GITHUB_SHA --config worker_config.dev.yaml --test
+        python cs_publisher/publish.py --tag test --config worker_config.dev.yaml --test
 
     # Push Docker images to Google Container Registry
     - name: Publish
       run: |
-        python cs_publisher/publish.py --tag v$GITHUB_SHA --config worker_config.dev.yaml --push
-
-    # Deploy the Docker image to the GKE cluster
-#     - name: Deploy
-#       run: |
-#         gcloud container clusters get-credentials $GKE_CLUSTER --zone $GKE_ZONE --project $GKE_PROJECT
-#         ./kustomize edit set image $REGISTRY_HOSTNAME/$GKE_PROJECT/$IMAGE:${GITHUB_SHA}
-#         ./kustomize build . | kubectl apply -f -
-#         kubectl rollout status deployment/$DEPLOYMENT_NAME
-#         kubectl get services -o wide
+        python cs_publisher/publish.py --tag test --config worker_config.dev.yaml --push
