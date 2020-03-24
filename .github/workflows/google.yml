@@ -48,7 +48,7 @@ jobs:
     # Build Docker images
     - name: Build
       run: |
-        echo $PWD && ls && python cs_publisher/publish.py --tag test --config worker_config.dev.yaml --build
+        echo $PWD && ls && python cs_publish/publish.py --tag test --config worker_config.dev.yaml --build
 
     # Test Docker images
     - name: Test
