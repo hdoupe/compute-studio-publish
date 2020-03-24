@@ -59,14 +59,14 @@ jobs:
     # Build Docker images
     - name: Build
       run: |
-        echo $PWD && ls && python cs_publish/publish.py --tag test --config worker_config.dev.yaml --build
+        python cs_publish/publish.py --tag test --config worker_config.dev.yaml --build
 
     # Test Docker images
     - name: Test
       run: |
-        python cs_publisher/publish.py --tag test --config worker_config.dev.yaml --test
+        python cs_publish/publish.py --tag test --config worker_config.dev.yaml --test
 
     # Push Docker images to Google Container Registry
     - name: Publish
       run: |
-        python cs_publisher/publish.py --tag test --config worker_config.dev.yaml --push
+        python cs_publish/publish.py --tag test --config worker_config.dev.yaml --push
