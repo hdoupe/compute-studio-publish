@@ -8,7 +8,7 @@
 #
 # 3. Change the values for the GKE_ZONE, GKE_CLUSTER, IMAGE, REGISTRY_HOSTNAME and DEPLOYMENT_NAME environment variables (below).
 
-name: Build and Deploy to GKE
+name: Build, Test, and Push docker images
 
 on:
   release:
@@ -46,22 +46,22 @@ jobs:
         # Set up docker to authenticate
         # via gcloud command-line tool.
         gcloud auth configure-docker
-      
+
     # Build Docker images
     - name: Build
-      run: |        
+      run: |
         python cs_publisher/publish.py --tag v$GITHUB_SHA --config worker_config.dev.yaml --build
-    
+
     # Test Docker images
     - name: Test
-      run: |        
+      run: |
         python cs_publisher/publish.py --tag v$GITHUB_SHA --config worker_config.dev.yaml --test
 
     # Push Docker images to Google Container Registry
     - name: Publish
       run: |
         python cs_publisher/publish.py --tag v$GITHUB_SHA --config worker_config.dev.yaml --push
-        
+
     # Deploy the Docker image to the GKE cluster
 #     - name: Deploy
 #       run: |
