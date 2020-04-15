@@ -1,0 +1,7 @@
+pip
+celery
+redis
+pytest
+toolz
+boto3
+cs-storage>=1.9.0

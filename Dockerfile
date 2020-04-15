@@ -49,7 +49,7 @@ ARG INSTALL_NUM=0
 RUN pip install "git+${REPO_URL}.git@${BRANCH}#egg=cs-config&subdirectory=cs-config"
 ADD ${RAW_REPO_URL}/${BRANCH}/cs-config/cs_config/tests/test_functions.py /home
 RUN pip install cs-kit
-# RUN py.test /home/test_functions.py -v -s
+RUN py.test /home/test_functions.py -v -s
 ######################
 
 ARG SIM_TIME_LIMIT
@@ -57,17 +57,13 @@ RUN mkdir /home/distributed/api/celery_app
 COPY tasks.py /home/distributed/api/celery_app
 
 # Just grab files from c/s repo for now
-ADD https://raw.githubusercontent.com/compute-tooling/compute-studio/master/distributed/api/__init__.py /home/distributed/api/__init__.py
-ADD https://raw.githubusercontent.com/compute-tooling/compute-studio/master/distributed/api/celery_app/__init__.py /home/distributed/api/celery_app/__init__.py
-ADD https://raw.githubusercontent.com/compute-tooling/compute-studio/master/distributed/setup.py /home/distributed
-RUN cd /home/distributed && pip install -e .
+ADD cs_publish /home
+ADD setup.py /home
+RUN cd /home/ && pip install -e .
 
-WORKDIR /home/distributed/api
+WORKDIR /home
 
-# COPY celery_sim.sh /home/distributed/api/celery_sim.sh
-# COPY celery_io.sh /home/distributed/api/celery_io.sh
-
-# COPY ./cs-dask-sim /home/distributed/cs-dask-sim
-# RUN cd /home/distributed/cs-dask-sim && pip install -e .
+COPY celery_sim.sh /home
+COPY celery_io.sh /home
 
 RUN conda install -c conda-forge "pyee<6"

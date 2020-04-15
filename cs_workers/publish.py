@@ -1,4 +1,5 @@
 import argparse
+import copy
 import yaml
 import os
 import re
@@ -9,6 +10,7 @@ from pathlib import Path
 
 TAG = os.environ.get("TAG", "")
 PROJECT = os.environ.get("PROJECT", "cs-workers-dev")
+CURR_PATH = Path(os.path.abspath(os.path.dirname(__file__)))
 
 
 def clean(word):
@@ -38,6 +40,7 @@ class Publisher:
     """
 
     cr = "gcr.io"
+    kubernetes_target = CURR_PATH / Path("..") / Path("kubernetes")
 
     def __init__(self, config, tag, project, models=None):
         self.tag = tag
@@ -47,6 +50,15 @@ class Publisher:
         with open(config, "r") as f:
             self.config = yaml.safe_load(f.read())
 
+        with open(
+            CURR_PATH
+            / Path("..")
+            / Path("templates")
+            / Path("sc-deployment.template.yaml"),
+            "r",
+        ) as f:
+            self.sc_template = yaml.safe_load(f.read())
+
     def build(self):
         self.apply_method_to_apps(method=self.build_app_image)
 
@@ -55,6 +67,9 @@ class Publisher:
 
     def push(self):
         self.apply_method_to_apps(method=self.push_app_image)
+
+    def make_config(self):
+        self.apply_method_to_apps(method=self.write_sc_app)
 
     def apply_method_to_apps(self, method):
         """
@@ -101,9 +116,7 @@ class Publisher:
         buildargs_str = " ".join(
             [f"--build-arg {arg}={value}" for arg, value in buildargs.items()]
         )
-        cmd = (
-            f"docker build {buildargs_str} -t {img_name}:{self.tag} ./"
-        )
+        cmd = f"docker build {buildargs_str} -t {img_name}:{self.tag} ./"
         run(cmd)
 
         run(
@@ -114,7 +127,9 @@ class Publisher:
         safeowner = clean(app["owner"])
         safetitle = clean(app["title"])
         img_name = f"{safeowner}_{safetitle}_tasks"
-        run(f"docker run {self.cr}/{self.project}/{img_name}:{self.tag} py.test /home/test_functions.py -v -s")
+        run(
+            f"docker run {self.cr}/{self.project}/{img_name}:{self.tag} py.test /home/test_functions.py -v -s"
+        )
 
     def push_app_image(self, app):
         safeowner = clean(app["owner"])
@@ -122,8 +137,65 @@ class Publisher:
         img_name = f"{safeowner}_{safetitle}_tasks"
         run(f"docker push {self.cr}/{self.project}/{img_name}:{self.tag}")
 
+    def write_sc_app(self, app, action):
+        app_deployment = copy.deepcopy(self.sc_template)
+        safeowner = clean(app["owner"])
+        safetitle = clean(app["title"])
+        name = f"{safeowner}-{safetitle}-{action}"
 
-if __name__ == "__main__":
+        resources, affinity_size = self._resources(app, action)
+
+        if not isinstance(affinity_size, list):
+            affinity_size = [affinity_size]
+
+        app_deployment["metadata"]["name"] = name
+        app_deployment["spec"]["selector"]["matchLabels"]["app"] = name
+        app_deployment["spec"]["template"]["metadata"]["labels"]["app"] = name
+
+        container_config = app_deployment["spec"]["template"]["spec"]["containers"][0]
+
+        container_config.update(
+            {
+                "name": name,
+                "image": f"{self.cr}/{self.project}/{safeowner}_{safetitle}_tasks:{self.tag}",
+                "command": [f"./celery_{action}.sh"],
+                "args": [
+                    app["owner"],
+                    app["title"],
+                ],  # TODO: pass safe names to docker file at build and run time
+                "resources": resources,
+            }
+        )
+
+        container_config["env"].append({"name": "TITLE", "value": app["title"]})
+        container_config["env"].append({"name": "OWNER", "value": app["owner"]})
+
+        self._set_secrets(app, container_config)
+
+        with open(self.kubernetes_target / Path(f"{name}-deployment.yaml"), "w") as f:
+            f.write(yaml.dump(app_deployment))
+
+        return app_deployment
+
+    def _resources(self, app, action):
+        if action == "io":
+            resources = {
+                "requests": {"cpu": 0.7, "memory": "0.25G"},
+                "limits": {"cpu": 1, "memory": "0.7G"},
+            }
+        else:
+            resources = {"requests": {"memory": "1G", "cpu": 1}}
+            resources = dict(resources, **copy.deepcopy(app["resources"]))
+        return resources
+
+    def _set_secrets(self, app, config):
+        # TODO: write secrets to secret config files instead of env.
+        if app.get("secret"):
+            for var, val in app["secret"].items():
+                config["env"].append({"name": var.upper(), "value": val})
+
+
+def main():
     parser = argparse.ArgumentParser(description="Deploy C/S compute cluster.")
     parser.add_argument("--config", required=True)
     parser.add_argument("--tag", required=False, default=TAG)
@@ -132,6 +204,7 @@ if __name__ == "__main__":
     parser.add_argument("--build", action="store_true")
     parser.add_argument("--test", action="store_true")
     parser.add_argument("--push", action="store_true")
+    parser.add_argument("--make-config", action="store_true")
 
     args = parser.parse_args()
 
@@ -144,3 +217,9 @@ if __name__ == "__main__":
         publisher.test()
     if args.push:
         publisher.push()
+    if args.make_config:
+        publisher.make_config()
+
+
+if __name__ == "__main__":
+    main()
