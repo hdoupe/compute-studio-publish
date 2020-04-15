@@ -3,5 +3,5 @@ title: Tax-Cruncher
 branch: master
 repo_url: https://github.com/PSLmodels/Tax-Cruncher
 env:
-  BUILD_NUM: 1
+  BUILD_NUM: 2
 sim_time_limit: 100
