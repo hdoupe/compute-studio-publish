@@ -42,6 +42,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        pip install -e .
 
     # Setup gcloud CLI
     - uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
@@ -59,14 +60,14 @@ jobs:
     # Build Docker images
     - name: Build
       run: |
-        python cs_publish/publish.py --tag $GITHUB_SHA --build
+        cs-workers --tag $GITHUB_SHA --build
 
     # Test Docker images
     - name: Test
       run: |
-        python cs_publish/publish.py --tag $GITHUB_SHA --test
+        cs-workers --tag $GITHUB_SHA --test
 
     # Push Docker images to Google Container Registry
     - name: Publish
       run: |
-        python cs_publish/publish.py --tag $GITHUB_SHA --push
+        cs-workers --tag $GITHUB_SHA --push
