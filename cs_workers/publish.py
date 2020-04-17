@@ -44,7 +44,7 @@ class Publisher:
     cr = "gcr.io"
     kubernetes_target = CURR_PATH / Path("..") / Path("kubernetes")
 
-    def __init__(self, tag, project, models=None, base_branch="master"):
+    def __init__(self, tag, project, models=None, base_branch="origin/master"):
         self.tag = tag
         self.project = project
         self.models = models if models and models[0] else None
