@@ -53,17 +53,16 @@ RUN py.test /home/test_functions.py -v -s
 ######################
 
 ARG SIM_TIME_LIMIT
-RUN mkdir /home/distributed/api/celery_app
-COPY tasks.py /home/distributed/api/celery_app
 
 # Just grab files from c/s repo for now
-ADD cs_publish /home
+RUN mkdir /home/cs_workers
+ADD cs_workers /home/cs_workers
 ADD setup.py /home
 RUN cd /home/ && pip install -e .
 
 WORKDIR /home
 
-COPY celery_sim.sh /home
-COPY celery_io.sh /home
+COPY scripts/celery_sim.sh /home
+COPY scripts/celery_io.sh /home
 
 RUN conda install -c conda-forge "pyee<6"

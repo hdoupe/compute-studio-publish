@@ -7,10 +7,12 @@ import subprocess
 import time
 from pathlib import Path
 
+from git import Repo
 
 TAG = os.environ.get("TAG", "")
 PROJECT = os.environ.get("PROJECT", "cs-workers-dev")
 CURR_PATH = Path(os.path.abspath(os.path.dirname(__file__)))
+BASE_PATH = CURR_PATH / ".."
 
 
 def clean(word):
@@ -42,13 +44,13 @@ class Publisher:
     cr = "gcr.io"
     kubernetes_target = CURR_PATH / Path("..") / Path("kubernetes")
 
-    def __init__(self, config, tag, project, models=None):
+    def __init__(self, tag, project, models=None, base_branch="master"):
         self.tag = tag
         self.project = project
         self.models = models if models and models[0] else None
+        self.base_branch = base_branch
 
-        with open(config, "r") as f:
-            self.config = yaml.safe_load(f.read())
+        self.config = self.get_config()
 
         with open(
             CURR_PATH
@@ -58,6 +60,31 @@ class Publisher:
             "r",
         ) as f:
             self.sc_template = yaml.safe_load(f.read())
+
+    def get_config(self):
+        r = Repo()
+        config = {}
+        files_with_diff = r.index.diff(r.commit(self.base_branch), paths="config")
+        for config_file in files_with_diff:
+            if config_file.a_path == "config/worker_config.dev.yaml":
+                continue
+            with open(config_file.a_path, "r") as f:
+                c = yaml.safe_load(f.read())
+            config[(c["owner"], c["title"])] = c
+        if self.models:
+            for owner_title in self.models:
+                owner, title = owner_title.split("/")
+                if (owner, title) in config:
+                    continue
+                else:
+                    config_file = (
+                        BASE_PATH / Path("config") / Path(owner) / Path(f"{title}.yaml")
+                    )
+                    with open(config_file, "r") as f:
+                        c = yaml.safe_load(f.read())
+                    config[(c["owner"], c["title"])] = c
+        print("Updating:\n", "\n".join(f"{o}/{t}" for o, t in config.keys()))
+        return config
 
     def build(self):
         self.apply_method_to_apps(method=self.build_app_image)
@@ -77,23 +104,26 @@ class Publisher:
         for all apps in config. Filters out those not in models
         list, if applicable.
         """
-        for app in self.config:
-            if self.models and app["title"] not in self.models[0]:
+        for name, app in self.config.items():
+            if self.models and f"{name[0]}/{name[1]}" not in self.models:
                 continue
             try:
                 method(app)
-            except Exception as e:
+            except Exception:
                 print(
                     f"There was an error building: "
                     f"{app['title']}/{app['owner']}:{self.tag}"
                 )
-                print(e)
+                import traceback as tb
+
+                tb.print_exc()
                 continue
 
     def build_app_image(self, app):
         """
         Build, tag, and pus the image for a single app.
         """
+        print(app)
         safeowner = clean(app["owner"])
         safetitle = clean(app["title"])
         img_name = f"{safeowner}_{safetitle}_tasks"
@@ -137,16 +167,17 @@ class Publisher:
         img_name = f"{safeowner}_{safetitle}_tasks"
         run(f"docker push {self.cr}/{self.project}/{img_name}:{self.tag}")
 
-    def write_sc_app(self, app, action):
+    def write_sc_app(self, app):
+        for action in ["io", "sim"]:
+            self._write_sc_app(app, action)
+
+    def _write_sc_app(self, app, action):
         app_deployment = copy.deepcopy(self.sc_template)
         safeowner = clean(app["owner"])
         safetitle = clean(app["title"])
         name = f"{safeowner}-{safetitle}-{action}"
 
-        resources, affinity_size = self._resources(app, action)
-
-        if not isinstance(affinity_size, list):
-            affinity_size = [affinity_size]
+        resources = self._resources(app, action)
 
         app_deployment["metadata"]["name"] = name
         app_deployment["spec"]["selector"]["matchLabels"]["app"] = name
@@ -197,7 +228,6 @@ class Publisher:
 
 def main():
     parser = argparse.ArgumentParser(description="Deploy C/S compute cluster.")
-    parser.add_argument("--config", required=True)
     parser.add_argument("--tag", required=False, default=TAG)
     parser.add_argument("--project", required=False, default=PROJECT)
     parser.add_argument("--models", nargs="+", type=str, required=False, default=None)
@@ -208,9 +238,7 @@ def main():
 
     args = parser.parse_args()
 
-    publisher = Publisher(
-        config=args.config, tag=args.tag, project=args.project, models=args.models
-    )
+    publisher = Publisher(tag=args.tag, project=args.project, models=args.models)
     if args.build:
         publisher.build()
     if args.test:

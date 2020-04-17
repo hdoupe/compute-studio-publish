@@ -15,11 +15,11 @@ import cs_storage
 try:
     from cs_config import functions
 except ImportError as ie:
-    if os.environ.get("IS_FLASK", "False") == "True":
-        functions = None
-    else:
-        raise ie
-
+    # if os.environ.get("IS_FLASK", "False") == "True":
+    #     functions = None
+    # else:
+    #     raise ie
+    pass
 
 COMP_URL = os.environ.get("COMP_URL")
 COMP_API_TOKEN = os.environ.get("COMP_API_TOKEN")
@@ -65,9 +65,7 @@ def get_task_routes():
 task_routes = get_task_routes()
 
 
-app = Celery(
-    "app", broker=CELERY_BROKER_URL, backend=CELERY_RESULT_BACKEND
-)
+app = Celery("app", broker=CELERY_BROKER_URL, backend=CELERY_RESULT_BACKEND)
 app.conf.update(
     task_serializer="json",
     accept_content=["msgpack", "json"],
