@@ -52,7 +52,7 @@ jobs:
         service_account_key: ${{ secrets.GKE_KEY }}
 
     - name: has git?
-      run: git fetch origin
+      run: git fetch origin master
 
     # Configure docker to use the gcloud command-line tool as a credential helper
     - run: |
