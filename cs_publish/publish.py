@@ -53,7 +53,11 @@ class Publisher:
         self.config = self.get_config()
 
         with open(
-            CURR_PATH / Path("..") / Path("templates") / Path("sc-deployment.template.yaml"), "r",
+            CURR_PATH
+            / Path("..")
+            / Path("templates")
+            / Path("sc-deployment.template.yaml"),
+            "r",
         ) as f:
             self.sc_template = yaml.safe_load(f.read())
 
@@ -62,7 +66,10 @@ class Publisher:
         config = {}
         files_with_diff = r.index.diff(r.commit(self.base_branch), paths="config")
         for config_file in files_with_diff:
-            if config_file.a_path in ("config/worker_config.dev.yaml", "config/secret.yaml"):
+            if config_file.a_path in (
+                "config/worker_config.dev.yaml",
+                "config/secret.yaml",
+            ):
                 continue
             with open(config_file.a_path, "r") as f:
                 c = yaml.safe_load(f.read())
@@ -73,7 +80,9 @@ class Publisher:
                 if (owner, title) in config:
                     continue
                 else:
-                    config_file = BASE_PATH / Path("config") / Path(owner) / Path(f"{title}.yaml")
+                    config_file = (
+                        BASE_PATH / Path("config") / Path(owner) / Path(f"{title}.yaml")
+                    )
                     with open(config_file, "r") as f:
                         c = yaml.safe_load(f.read())
                     config[(c["owner"], c["title"])] = c
@@ -108,7 +117,10 @@ class Publisher:
             try:
                 method(app)
             except Exception:
-                print(f"There was an error building: " f"{app['title']}/{app['owner']}:{self.tag}")
+                print(
+                    f"There was an error building: "
+                    f"{app['title']}/{app['owner']}:{self.tag}"
+                )
                 import traceback as tb
 
                 tb.print_exc()
@@ -138,11 +150,15 @@ class Publisher:
             **app["env"],
         )
 
-        buildargs_str = " ".join([f"--build-arg {arg}={value}" for arg, value in buildargs.items()])
+        buildargs_str = " ".join(
+            [f"--build-arg {arg}={value}" for arg, value in buildargs.items()]
+        )
         cmd = f"docker build {buildargs_str} -t {img_name}:{self.tag} ./"
         run(cmd)
 
-        run(f"docker tag {img_name}:{self.tag} {self.cr}/{self.project}/{img_name}:{self.tag}")
+        run(
+            f"docker tag {img_name}:{self.tag} {self.cr}/{self.project}/{img_name}:{self.tag}"
+        )
 
     def test_app_image(self, app):
         safeowner = clean(app["owner"])
@@ -191,7 +207,12 @@ class Publisher:
 
         container_config["env"].append({"name": "TITLE", "value": app["title"]})
         container_config["env"].append({"name": "OWNER", "value": app["owner"]})
-
+        container_config["env"].append(
+            {"name": "SIM_TIME_LIMIT", "value": str(app["sim_time_limit"])}
+        )
+        container_config["env"].append(
+            {"name": "APP_NAME", "value": f"{safeowner}_{safetitle}"}
+        )
         self._set_secrets(app, container_config)
 
         with open(self.kubernetes_target / Path(f"{name}-deployment.yaml"), "w") as f:
