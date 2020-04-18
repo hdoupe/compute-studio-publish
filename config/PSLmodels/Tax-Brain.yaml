@@ -1,0 +1,15 @@
+owner: PSLmodels
+title: Tax-Brain
+branch: master
+repo_url: https://github.com/PSLmodels/Tax-Brain
+cluster_type: single-core
+env:
+  BUILD_NUM: 0
+resources:
+  limits:
+    cpu: 2
+    memory: 20GB
+  requests:
+    cpu: 1
+    memory: 14G
+sim_time_limit: 1200
