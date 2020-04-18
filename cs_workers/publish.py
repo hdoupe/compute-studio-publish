@@ -62,7 +62,7 @@ class Publisher:
         config = {}
         files_with_diff = r.index.diff(r.commit(self.base_branch), paths="config")
         for config_file in files_with_diff:
-            if config_file.a_path in ("config/worker_config.dev.yaml", "secret.yaml"):
+            if config_file.a_path in ("config/worker_config.dev.yaml", "config/secret.yaml"):
                 continue
             with open(config_file.a_path, "r") as f:
                 c = yaml.safe_load(f.read())
