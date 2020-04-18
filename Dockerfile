@@ -48,3 +48,6 @@ WORKDIR /home
 
 COPY scripts/celery_sim.sh /home
 COPY scripts/celery_io.sh /home
+
+ENV CELERY_BROKER_URL redis://redis-master/0
+ENV CELERY_RESULT_BACKEND redis://redis-master/0

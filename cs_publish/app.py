@@ -23,9 +23,9 @@ except ImportError as ie:
 
 CS_URL = os.environ.get("CS_URL")
 
-CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379")
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://redis-master/0")
 CELERY_RESULT_BACKEND = os.environ.get(
-    "CELERY_RESULT_BACKEND", "redis://localhost:6379"
+    "CELERY_RESULT_BACKEND", "redis://redis-master/0"
 )
 
 OUTPUTS_VERSION = os.environ.get("OUTPUTS_VERSION")
