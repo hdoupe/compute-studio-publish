@@ -1,7 +1,7 @@
 import time
 import os
 
-from cs_workers import app, task_wrapper
+from cs_publish import app, task_wrapper
 
 try:
     from cs_config import functions
@@ -59,4 +59,3 @@ def sim(self, meta_param_dict, adjustment):
             return fut.result()
 
     return functions.run_model(meta_param_dict, adjustment)
-

@@ -9,7 +9,7 @@ else:
 
 
 setuptools.setup(
-    name="cs-workers",
+    name="cs-publish",
     version=os.environ.get("TAG", "0.0.0"),
     author="Hank Doupe",
     author_email="hank@compute.studio",
@@ -20,7 +20,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     install_requires=["celery", "redis", "gitpython"],
     include_package_data=True,
-    entry_points={"console_scripts": ["cs-workers=cs_workers.publish:main"]},
+    entry_points={"console_scripts": ["cs-publish=cs_publish.publish:main"]},
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: GNU Affero General Public License v3",

@@ -66,7 +66,6 @@ class Publisher:
                 continue
             with open(config_file.a_path, "r") as f:
                 c = yaml.safe_load(f.read())
-            print(c, config_file.a_path)
             config[(c["owner"], c["title"])] = c
         if self.models:
             for owner_title in self.models:
@@ -78,7 +77,11 @@ class Publisher:
                     with open(config_file, "r") as f:
                         c = yaml.safe_load(f.read())
                     config[(c["owner"], c["title"])] = c
-        print("Updating:\n", "\n".join(f"{o}/{t}" for o, t in config.keys()))
+        if config:
+            print("Updating:")
+            print("\n".join(f"  {o}/{t}" for o, t in config.keys()))
+        else:
+            print("No changes detected.")
         return config
 
     def build(self):
