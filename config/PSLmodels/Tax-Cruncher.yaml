@@ -1,0 +1,10 @@
+owner: PSLmodels
+title: Tax-Cruncher
+branch: master
+repo_url: https://github.com/PSLmodels/Tax-Cruncher
+env:
+  BUILD_NUM: 2
+sim_time_limit: 100
+resources:
+  cpu: 2500m
+  memory: 7629Mi

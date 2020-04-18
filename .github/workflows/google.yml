@@ -41,7 +41,8 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pyyaml
+        pip install -r requirements.txt
+        pip install -e .
 
     # Setup gcloud CLI
     - uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
@@ -49,6 +50,9 @@ jobs:
         version: '270.0.0'
         service_account_email: ${{ secrets.GKE_EMAIL }}
         service_account_key: ${{ secrets.GKE_KEY }}
+
+    - name: has git?
+      run: git fetch origin master
 
     # Configure docker to use the gcloud command-line tool as a credential helper
     - run: |
@@ -59,14 +63,14 @@ jobs:
     # Build Docker images
     - name: Build
       run: |
-        python cs_publish/publish.py --tag test --config worker_config.dev.yaml --build
+        cs-workers --tag $GITHUB_SHA --build
 
     # Test Docker images
     - name: Test
       run: |
-        python cs_publish/publish.py --tag test --config worker_config.dev.yaml --test
+        cs-workers --tag $GITHUB_SHA --test
 
     # Push Docker images to Google Container Registry
     - name: Publish
       run: |
-        python cs_publish/publish.py --tag test --config worker_config.dev.yaml --push
+        cs-workers --tag $GITHUB_SHA --push
