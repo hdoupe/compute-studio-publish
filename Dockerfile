@@ -49,7 +49,7 @@ ARG INSTALL_NUM=0
 RUN pip install "git+${REPO_URL}.git@${BRANCH}#egg=cs-config&subdirectory=cs-config"
 ADD ${RAW_REPO_URL}/${BRANCH}/cs-config/cs_config/tests/test_functions.py /home
 RUN pip install cs-kit
-RUN py.test /home/test_functions.py -v -s
+# RUN py.test /home/test_functions.py -v -s
 ######################
 
 ARG SIM_TIME_LIMIT
