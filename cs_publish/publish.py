@@ -78,7 +78,8 @@ class Publisher:
                         c = yaml.safe_load(f.read())
                     config[(c["owner"], c["title"])] = c
         if config:
-            print("Updating:\n", "\n\t".join(f"{o}/{t}" for o, t in config.keys()))
+            print("Updating:")
+            print("\n".join(f"  {o}/{t}" for o, t in config.keys()))
         else:
             print("No changes detected.")
         return config
