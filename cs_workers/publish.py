@@ -70,6 +70,7 @@ class Publisher:
                 continue
             with open(config_file.a_path, "r") as f:
                 c = yaml.safe_load(f.read())
+            print(c, config_file.a_path)
             config[(c["owner"], c["title"])] = c
         if self.models:
             for owner_title in self.models:
