@@ -63,14 +63,14 @@ jobs:
     # Build Docker images
     - name: Build
       run: |
-        cs-workers --tag $GITHUB_SHA --build
+        cs-publish --tag $GITHUB_SHA --build
 
     # Test Docker images
     - name: Test
       run: |
-        cs-workers --tag $GITHUB_SHA --test
+        cs-publish --tag $GITHUB_SHA --test
 
     # Push Docker images to Google Container Registry
     - name: Publish
       run: |
-        cs-workers --tag $GITHUB_SHA --push
+        cs-publish --tag $GITHUB_SHA --push

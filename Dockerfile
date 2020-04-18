@@ -55,8 +55,8 @@ RUN pip install cs-kit
 ARG SIM_TIME_LIMIT
 
 # Just grab files from c/s repo for now
-RUN mkdir /home/cs_workers
-ADD cs_workers /home/cs_workers
+RUN mkdir /home/cs_publish
+ADD cs_publish /home/cs_publish
 ADD setup.py /home
 RUN cd /home/ && pip install -e .
 
