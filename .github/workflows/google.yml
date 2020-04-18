@@ -32,6 +32,8 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v2
 
+    - run: git fetch origin master
+
     - name: Set up Python
       uses: actions/setup-python@v1
       with:
@@ -50,9 +52,6 @@ jobs:
         version: '270.0.0'
         service_account_email: ${{ secrets.GKE_EMAIL }}
         service_account_key: ${{ secrets.GKE_KEY }}
-
-    - name: has git?
-      run: git fetch origin master
 
     # Configure docker to use the gcloud command-line tool as a credential helper
     - run: |
