@@ -33,13 +33,3 @@ spec:
                 secretKeyRef:
                   name: worker-secret
                   key: CS_URL
-            - name: CS_API_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: worker-secret
-                  key: CS_API_TOKEN
-            - name: BUCKET
-              valueFrom:
-                secretKeyRef:
-                  name: worker-secret
-                  key: BUCKET

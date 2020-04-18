@@ -21,8 +21,7 @@ except ImportError as ie:
     #     raise ie
     pass
 
-COMP_URL = os.environ.get("COMP_URL")
-COMP_API_TOKEN = os.environ.get("COMP_API_TOKEN")
+CS_URL = os.environ.get("CS_URL")
 
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379")
 CELERY_RESULT_BACKEND = os.environ.get(
@@ -36,8 +35,8 @@ def get_task_routes():
     def clean(name):
         return re.sub("[^0-9a-zA-Z]+", "", name).lower()
 
-    print(f"getting config from: {COMP_URL}/publish/api/")
-    resp = requests.get(f"{COMP_URL}/publish/api/")
+    print(f"getting config from: {CS_URL}/publish/api/")
+    resp = requests.get(f"{CS_URL}/publish/api/")
     if resp.status_code != 200:
         raise Exception(f"Response status code: {resp.status_code}")
     data = resp.json()
@@ -91,7 +90,13 @@ def task_wrapper(func):
                     res["model_version"] = "NA"
                     res.update(dict(outputs, **{"version": version}))
                 else:
-                    outputs = cs_storage.write(task_id, outputs)
+                    res = (
+                        app.signature(
+                            "outputs_processor.process", args=(task_id, outputs),
+                        )
+                        .delay()
+                        .get()
+                    )
                     res.update(
                         {
                             "model_version": functions.get_version(),
@@ -123,24 +128,14 @@ def post_results(sender=None, headers=None, body=None, **kwargs):
     print(f'task: {kwargs["task"]} {kwargs["task"].name}')
     print(f'is sim: {kwargs["task"].name.endswith("sim")}')
     print(f'state: {kwargs["state"]}')
-    kwargs["retval"]["job_id"] = kwargs["task_id"]
+    result = kwargs["retval"]
+    result["job_id"] = kwargs["task_id"]
+
     if kwargs["task"].name.endswith("sim"):
-        print(f"posting data to {COMP_URL}/outputs/api/")
-        resp = requests.put(
-            f"{COMP_URL}/outputs/api/",
-            json=kwargs["retval"],
-            headers={"Authorization": f"Token {COMP_API_TOKEN}"},
-        )
-        print("resp", resp.status_code)
-        if resp.status_code == 400:
-            print("errors", resp.json())
-    if kwargs["task"].name.endswith("parse"):
-        print(f"posting data to {COMP_URL}/inputs/api/")
-        resp = requests.put(
-            f"{COMP_URL}/inputs/api/",
-            json=kwargs["retval"],
-            headers={"Authorization": f"Token {COMP_API_TOKEN}"},
-        )
-        print("resp", resp.status_code)
-        if resp.status_code == 400:
-            print("errors", resp.json())
+        task_type = "sim"
+    elif kwargs["task"].name.endswith("parse"):
+        task_type = "parse"
+    else:
+        return None
+
+    app.signature("outputs_processor.push", args=(task_type, result)).delay()

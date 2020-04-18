@@ -1,7 +1,7 @@
 import time
 import os
 
-from cs_publish import app, task_wrapper
+from cs_publish.app import app, task_wrapper
 
 try:
     from cs_config import functions
