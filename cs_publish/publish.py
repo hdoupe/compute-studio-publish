@@ -211,7 +211,7 @@ class Publisher:
             {"name": "SIM_TIME_LIMIT", "value": str(app["sim_time_limit"])}
         )
         container_config["env"].append(
-            {"name": "APP_NAME", "value": f"{safeowner}_{safetitle}"}
+            {"name": "APP_NAME", "value": f"{safeowner}_{safetitle}_tasks"}
         )
         self._set_secrets(app, container_config)
 
