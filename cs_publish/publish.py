@@ -52,6 +52,9 @@ class Publisher:
 
         self.config = self.get_config()
 
+        if not self.kubernetes_target.exists():
+            os.mkdir(self.kubernetes_target)
+
         with open(
             CURR_PATH
             / Path("..")
