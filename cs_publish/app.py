@@ -22,9 +22,6 @@ except ImportError as ie:
     pass
 
 
-from cs_publish.io import serialize_to_json
-
-
 CS_URL = os.environ.get("CS_URL")
 
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://redis-master/0")
@@ -94,7 +91,7 @@ def task_wrapper(func):
                     res["model_version"] = "NA"
                     res.update(dict(outputs, **{"version": version}))
                 else:
-                    serialize_to_json(outputs)
+                    outputs = cs_storage.serialize_to_json(outputs)
                     res = (
                         app.signature(
                             "outputs_processor.write_to_storage",
