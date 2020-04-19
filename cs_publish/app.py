@@ -92,7 +92,7 @@ def task_wrapper(func):
                     res.update(dict(outputs, **{"version": version}))
                 else:
                     outputs = cs_storage.serialize_to_json(outputs)
-                    res = (
+                    outputs = (
                         app.signature(
                             "outputs_processor.write_to_storage",
                             args=(task_id, outputs),
