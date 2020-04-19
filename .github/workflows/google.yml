@@ -10,7 +10,13 @@
 
 name: Build, Test, and Push docker images
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
 
 # Environment variables available to all jobs and steps in this workflow
 env:
