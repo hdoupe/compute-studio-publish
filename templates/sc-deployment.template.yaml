@@ -33,12 +33,5 @@ spec:
                 secretKeyRef:
                   name: worker-secret
                   key: CS_URL
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: component
-                    operator: In
-                    values:
-                      - model
+      nodeSelector:
+        component: model
