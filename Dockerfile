@@ -39,14 +39,15 @@ ADD ${RAW_REPO_URL}/${BRANCH}/cs-config/cs_config/tests/test_functions.py /home
 RUN pip install cs-kit
 ######################
 
-ARG SIM_TIME_LIMIT
-
 RUN mkdir /home/cs_publish
-ADD cs_publish /home/cs_publish
-ADD setup.py /home
+COPY cs_publish /home/cs_publish
+COPY setup.py /home
 RUN cd /home/ && pip install -e .
 
 WORKDIR /home
 
 COPY scripts/celery_sim.sh /home
 COPY scripts/celery_io.sh /home
+
+ENV CELERY_BROKER_URL redis://redis-master/0
+ENV CELERY_RESULT_BACKEND redis://redis-master/0

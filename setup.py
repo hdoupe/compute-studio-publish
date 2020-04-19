@@ -18,7 +18,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/compute-tooling/compute-studio-workers",
     packages=setuptools.find_packages(),
-    install_requires=["celery", "redis", "gitpython"],
+    install_requires=["celery", "redis", "gitpython", "pyyaml"],
     include_package_data=True,
     entry_points={"console_scripts": ["cs-publish=cs_publish.publish:main"]},
     classifiers=[

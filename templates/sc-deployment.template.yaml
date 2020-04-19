@@ -33,3 +33,5 @@ spec:
                 secretKeyRef:
                   name: worker-secret
                   key: CS_URL
+      nodeSelector:
+        component: model

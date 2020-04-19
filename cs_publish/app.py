@@ -21,11 +21,12 @@ except ImportError as ie:
     #     raise ie
     pass
 
+
 CS_URL = os.environ.get("CS_URL")
 
-CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379")
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://redis-master/0")
 CELERY_RESULT_BACKEND = os.environ.get(
-    "CELERY_RESULT_BACKEND", "redis://localhost:6379"
+    "CELERY_RESULT_BACKEND", "redis://redis-master/0"
 )
 
 OUTPUTS_VERSION = os.environ.get("OUTPUTS_VERSION")
@@ -90,12 +91,18 @@ def task_wrapper(func):
                     res["model_version"] = "NA"
                     res.update(dict(outputs, **{"version": version}))
                 else:
-                    res = (
+                    outputs = cs_storage.serialize_to_json(outputs)
+                    outputs = (
                         app.signature(
-                            "outputs_processor.process", args=(task_id, outputs),
+                            "outputs_processor.write_to_storage",
+                            args=(task_id, outputs),
                         )
                         .delay()
-                        .get()
+                        .get(
+                            # danger: by default cannot run sync tasks
+                            # from within a task.
+                            disable_sync_subtasks=False,
+                        )
                     )
                     res.update(
                         {
@@ -138,4 +145,4 @@ def post_results(sender=None, headers=None, body=None, **kwargs):
     else:
         return None
 
-    app.signature("outputs_processor.push", args=(task_type, result)).delay()
+    app.signature("outputs_processor.push_to_cs", args=(task_type, result)).delay()
