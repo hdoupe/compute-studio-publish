@@ -18,10 +18,10 @@ env:
   PROJECT:  ${{ secrets.PROJECT }}
   GKE_EMAIL: ${{ secrets.GKE_EMAIL }}
   GITHUB_SHA: ${{ github.sha }}
-  GKE_ZONE: us-west1-a
-  GKE_CLUSTER: example-gke-cluster
+  GKE_ZONE: us-central1-c
+  GKE_CLUSTER: cluster-1
   REGISTRY_HOSTNAME: gcr.io
-  DEPLOYMENT_NAME: cs-publish-test
+  DEPLOYMENT_NAME: cs-publish-${{ github.sha }}
 
 jobs:
   setup-build-publish-deploy:
@@ -73,3 +73,12 @@ jobs:
     - name: Publish
       run: |
         cs-publish --tag $GITHUB_SHA --push
+
+    # Apply updates to cluster
+    - name: Deploy
+      run: |
+        gcloud container clusters get-credentials $GKE_CLUSTER --zone $GKE_ZONE --project $GKE_PROJECT
+        cs-publish --tag $GITHUB_SHA --make-config
+        kubectl apply -f kubernetes/
+        kubectl rollout status deployment/$DEPLOYMENT_NAME
+        kubectl get pods -o wide
