@@ -92,7 +92,8 @@ def task_wrapper(func):
                 else:
                     res = (
                         app.signature(
-                            "outputs_processor.process", args=(task_id, outputs),
+                            "outputs_processor.write_to_storage",
+                            args=(task_id, outputs),
                         )
                         .delay()
                         .get(
@@ -143,4 +144,4 @@ def post_results(sender=None, headers=None, body=None, **kwargs):
     else:
         return None
 
-    app.signature("outputs_processor.push", args=(task_type, result)).delay()
+    app.signature("outputs_processor.push_to_cs", args=(task_type, result)).delay()
