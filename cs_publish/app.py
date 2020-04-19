@@ -92,14 +92,14 @@ def task_wrapper(func):
                 else:
                     res = (
                         app.signature(
-                            "outputs_processor.process",
-                            args=(task_id, outputs),
+                            "outputs_processor.process", args=(task_id, outputs),
+                        )
+                        .delay()
+                        .get(
                             # danger: by default cannot run sync tasks
                             # from within a task.
                             disable_sync_subtasks=False,
                         )
-                        .delay()
-                        .get()
                     )
                     print("cs write res", res)
                     res.update(
