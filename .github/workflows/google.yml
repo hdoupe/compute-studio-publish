@@ -81,6 +81,7 @@ jobs:
 
     # Apply updates to cluster
     - name: Deploy
+      if: github.event_name == 'push'
       run: |
         gcloud container clusters get-credentials $GKE_CLUSTER --zone $GKE_ZONE --project $GKE_PROJECT
         cs-publish --tag $GITHUB_SHA --make-config
