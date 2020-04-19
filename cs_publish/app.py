@@ -104,7 +104,6 @@ def task_wrapper(func):
                             disable_sync_subtasks=False,
                         )
                     )
-                    print("cs write res", outputs)
                     res.update(
                         {
                             "model_version": functions.get_version(),
