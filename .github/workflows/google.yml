@@ -79,6 +79,7 @@ jobs:
       if: github.event_name == 'push'
       run: |
         git config -l
+        git show --name-only --oneline HEAD^..HEAD
         cs-publish --tag $GITHUB_SHA --push --base-branch 'HEAD^'
 
     # Apply updates to cluster
