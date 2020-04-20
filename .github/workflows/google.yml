@@ -37,7 +37,7 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v2
 
-    - run: git fetch origin master --depth 5
+    - run: git fetch origin master --depth 2
 
     - name: Set up Python
       uses: actions/setup-python@v1
@@ -78,8 +78,6 @@ jobs:
     - name: Publish
       if: github.event_name == 'push'
       run: |
-        git log -2
-        git show --name-only --oneline HEAD^..HEAD
         cs-publish --tag $GITHUB_SHA --push --base-branch 'HEAD^'
 
     # Apply updates to cluster
