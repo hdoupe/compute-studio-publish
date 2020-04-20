@@ -76,14 +76,15 @@ jobs:
 
     # Push Docker images to Google Container Registry
     - name: Publish
+      if: github.event_name == 'push'
       run: |
-        cs-publish --tag $GITHUB_SHA --push
+        cs-publish --tag $GITHUB_SHA --push --base-branch 'HEAD^'
 
     # Apply updates to cluster
     - name: Deploy
       if: github.event_name == 'push'
       run: |
         gcloud container clusters get-credentials $GKE_CLUSTER --zone $GKE_ZONE --project $GKE_PROJECT
-        cs-publish --tag $GITHUB_SHA --make-config
+        cs-publish --tag $GITHUB_SHA --make-config --base-branch 'HEAD^'
         kubectl apply -f kubernetes/
         kubectl get pods -o wide

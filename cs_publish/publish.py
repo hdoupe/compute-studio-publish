@@ -250,10 +250,16 @@ def main():
     parser.add_argument("--test", action="store_true")
     parser.add_argument("--push", action="store_true")
     parser.add_argument("--make-config", action="store_true")
+    parser.add_argument("--base-branch", default="origin/master")
 
     args = parser.parse_args()
 
-    publisher = Publisher(tag=args.tag, project=args.project, models=args.models)
+    publisher = Publisher(
+        tag=args.tag,
+        project=args.project,
+        models=args.models,
+        base_branch=args.base_branch,
+    )
     if args.build:
         publisher.build()
     if args.test:
