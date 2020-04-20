@@ -37,7 +37,7 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v2
 
-    - run: git fetch origin master --depth 1
+    - run: git fetch origin master --depth 5
 
     - name: Set up Python
       uses: actions/setup-python@v1
