@@ -105,11 +105,11 @@ def main():
 
     secrets = Secrets(args.owner, args.title, args.project)
     if args.secret_name and args.secret_value:
-        print(secrets.set_secret(args.secret_name, args.secret_value))
+        secrets.set_secret(args.secret_name, args.secret_value)
     elif args.secret_name:
         print(secrets.get_secret(args.secret_name))
     elif args.delete:
-        print(secrets.delete_secret(args.delete))
+        secrets.delete_secret(args.delete)
 
     if args.list:
         print(json.dumps(secrets.list_secrets(), indent=2))
