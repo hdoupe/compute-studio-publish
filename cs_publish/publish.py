@@ -1,31 +1,20 @@
 import argparse
 import copy
+import json
 import yaml
 import os
-import re
-import subprocess
-import time
+import sys
 from pathlib import Path
 
 from git import Repo
+
+from cs_publish.utils import clean, run
+from cs_publish.secrets import Secrets
 
 TAG = os.environ.get("TAG", "")
 PROJECT = os.environ.get("PROJECT", "cs-workers-dev")
 CURR_PATH = Path(os.path.abspath(os.path.dirname(__file__)))
 BASE_PATH = CURR_PATH / ".."
-
-
-def clean(word):
-    return re.sub("[^0-9a-zA-Z]+", "", word).lower()
-
-
-def run(cmd):
-    print(f"Running: {cmd}\n")
-    s = time.time()
-    res = subprocess.run(cmd, shell=True, check=True)
-    f = time.time()
-    print(f"\n\tFinished in {f-s} seconds.\n")
-    return res
 
 
 class Publisher:
@@ -44,16 +33,29 @@ class Publisher:
     cr = "gcr.io"
     kubernetes_target = CURR_PATH / Path("..") / Path("kubernetes")
 
-    def __init__(self, tag, project, models=None, base_branch="origin/master"):
+    def __init__(
+        self,
+        tag,
+        project,
+        models=None,
+        base_branch="origin/master",
+        quiet=False,
+        kubernetes_target=None,
+    ):
         self.tag = tag
         self.project = project
         self.models = models if models and models[0] else None
         self.base_branch = base_branch
+        self.quiet = quiet
+
+        self.kubernetes_target = kubernetes_target or self.kubernetes_target
+
+        if self.kubernetes_target == "-":
+            self.quiet = True
+        elif not self.kubernetes_target.exists():
+            os.mkdir(self.kubernetes_target)
 
         self.config = self.get_config()
-
-        if not self.kubernetes_target.exists():
-            os.mkdir(self.kubernetes_target)
 
         with open(
             CURR_PATH
@@ -63,6 +65,12 @@ class Publisher:
             "r",
         ) as f:
             self.sc_template = yaml.safe_load(f.read())
+
+        with open(
+            CURR_PATH / Path("..") / Path("templates") / Path("secret.template.yaml"),
+            "r",
+        ) as f:
+            self.secret_template = yaml.safe_load(f.read())
 
     def get_config(self):
         r = Repo()
@@ -89,11 +97,11 @@ class Publisher:
                     with open(config_file, "r") as f:
                         c = yaml.safe_load(f.read())
                     config[(c["owner"], c["title"])] = c
-        if config:
-            print("Updating:")
-            print("\n".join(f"  {o}/{t}" for o, t in config.keys()))
-        else:
-            print("No changes detected.")
+        if not self.quiet and config:
+            print("# Updating:")
+            print("\n#".join(f"  {o}/{t}" for o, t in config.keys()))
+        elif not self.quiet:
+            print("# No changes detected.")
         return config
 
     def build(self):
@@ -178,8 +186,30 @@ class Publisher:
         run(f"docker push {self.cr}/{self.project}/{img_name}:{self.tag}")
 
     def write_sc_app(self, app):
+        self.write_secrets(app)
         for action in ["io", "sim"]:
             self._write_sc_app(app, action)
+
+    def write_secrets(self, app):
+        secret_config = copy.deepcopy(self.secret_template)
+        safeowner = clean(app["owner"])
+        safetitle = clean(app["title"])
+        name = f"{safeowner}-{safetitle}-secret"
+
+        secret_config["metadata"]["name"] = name
+
+        for name, value in self._list_secrets(app).items():
+            secret_config["stringData"][name] = value
+
+        if self.kubernetes_target == "-":
+            sys.stdout.write(yaml.dump(secret_config))
+            sys.stdout.write("---")
+            sys.stdout.write("\n")
+        else:
+            with open(self.kubernetes_target / Path(f"{name}.yaml"), "w") as f:
+                f.write(yaml.dump(secret_config))
+
+        return secret_config
 
     def _write_sc_app(self, app, action):
         app_deployment = copy.deepcopy(self.sc_template)
@@ -218,8 +248,15 @@ class Publisher:
         )
         self._set_secrets(app, container_config)
 
-        with open(self.kubernetes_target / Path(f"{name}-deployment.yaml"), "w") as f:
-            f.write(yaml.dump(app_deployment))
+        if self.kubernetes_target == "-":
+            sys.stdout.write(yaml.dump(app_deployment))
+            sys.stdout.write("---")
+            sys.stdout.write("\n")
+        else:
+            with open(
+                self.kubernetes_target / Path(f"{name}-deployment.yaml"), "w"
+            ) as f:
+                f.write(yaml.dump(app_deployment))
 
         return app_deployment
 
@@ -235,10 +272,17 @@ class Publisher:
         return resources
 
     def _set_secrets(self, app, config):
-        # TODO: write secrets to secret config files instead of env.
-        if app.get("secret"):
-            for var, val in app["secret"].items():
-                config["env"].append({"name": var.upper(), "value": val})
+        safeowner = clean(app["owner"])
+        safetitle = clean(app["title"])
+        name = f"{safeowner}-{safetitle}-secret"
+        for key in self._list_secrets(app):
+            config["env"].append(
+                {"name": key, "valueFrom": {"secretKeyRef": {"name": name, "key": key}}}
+            )
+
+    def _list_secrets(self, app):
+        secret = Secrets(app["owner"], app["title"], self.project)
+        return secret.list_secrets()
 
 
 def main():
@@ -251,6 +295,8 @@ def main():
     parser.add_argument("--push", action="store_true")
     parser.add_argument("--make-config", action="store_true")
     parser.add_argument("--base-branch", default="origin/master")
+    parser.add_argument("--quiet", "-q", default=False)
+    parser.add_argument("--config-out", "-o", default=None)
 
     args = parser.parse_args()
 
@@ -259,6 +305,8 @@ def main():
         project=args.project,
         models=args.models,
         base_branch=args.base_branch,
+        quiet=args.quiet,
+        kubernetes_target=args.config_out,
     )
     if args.build:
         publisher.build()

@@ -20,7 +20,12 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     install_requires=["celery", "redis", "gitpython", "pyyaml"],
     include_package_data=True,
-    entry_points={"console_scripts": ["cs-publish=cs_publish.publish:main"]},
+    entry_points={
+        "console_scripts": [
+            "cs-publish=cs_publish.publish:main",
+            "cs-secrets=cs_publish.secrets:main",
+        ]
+    },
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: GNU Affero General Public License v3",
