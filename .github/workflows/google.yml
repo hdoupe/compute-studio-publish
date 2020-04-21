@@ -14,9 +14,13 @@ on:
   push:
     branches:
       - master
+    paths:
+      - "config/**"
   pull_request:
     branches:
       - master
+    paths:
+      - "config/**"
 
 # Environment variables available to all jobs and steps in this workflow
 env:
