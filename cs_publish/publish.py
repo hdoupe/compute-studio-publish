@@ -64,13 +64,20 @@ class Publisher:
             / Path("sc-deployment.template.yaml"),
             "r",
         ) as f:
-            self.sc_template = yaml.safe_load(f.read())
+            self.app_template = yaml.safe_load(f.read())
+
+        with open(
+            CURR_PATH / Path("..") / Path("templates") / Path("job.template.yaml"), "r"
+        ) as f:
+            self.job_template = yaml.safe_load(f.read())
 
         with open(
             CURR_PATH / Path("..") / Path("templates") / Path("secret.template.yaml"),
             "r",
         ) as f:
             self.secret_template = yaml.safe_load(f.read())
+
+        self.errored = set()
 
     def get_config(self):
         r = Repo()
@@ -113,8 +120,12 @@ class Publisher:
     def push(self):
         self.apply_method_to_apps(method=self.push_app_image)
 
-    def make_config(self):
-        self.apply_method_to_apps(method=self.write_sc_app)
+    def write_app_config(self):
+        self.apply_method_to_apps(method=self.write_secrets)
+        self.apply_method_to_apps(method=self._write_app_inputs_procesess)
+
+    def write_job_config(self):
+        self.apply_method_to_apps(method=self._write_job_config)
 
     def apply_method_to_apps(self, method):
         """
@@ -130,11 +141,12 @@ class Publisher:
             except Exception:
                 print(
                     f"There was an error building: "
-                    f"{app['title']}/{app['owner']}:{self.tag}"
+                    f"{app['owner']}/{app['title']}:{self.tag}"
                 )
                 import traceback as tb
 
                 tb.print_exc()
+                self.errored.add((app["owner"], app["title"]))
                 continue
 
     def build_app_image(self, app):
@@ -185,11 +197,6 @@ class Publisher:
         img_name = f"{safeowner}_{safetitle}_tasks"
         run(f"docker push {self.cr}/{self.project}/{img_name}:{self.tag}")
 
-    def write_sc_app(self, app):
-        self.write_secrets(app)
-        for action in ["io", "sim"]:
-            self._write_sc_app(app, action)
-
     def write_secrets(self, app):
         secret_config = copy.deepcopy(self.secret_template)
         safeowner = clean(app["owner"])
@@ -211,10 +218,11 @@ class Publisher:
 
         return secret_config
 
-    def _write_sc_app(self, app, action):
-        app_deployment = copy.deepcopy(self.sc_template)
+    def _write_app_inputs_procesess(self, app):
+        app_deployment = copy.deepcopy(self.app_template)
         safeowner = clean(app["owner"])
         safetitle = clean(app["title"])
+        action = "io"
         name = f"{safeowner}-{safetitle}-{action}"
 
         resources = self._resources(app, action)
@@ -260,7 +268,66 @@ class Publisher:
 
         return app_deployment
 
-    def _resources(self, app, action):
+    def _write_job_config(self, app):
+        job = self.job_config(app)
+        safeowner = clean(app["owner"])
+        safetitle = clean(app["title"])
+        name = f"{safeowner}-{safetitle}-job"
+
+        if self.kubernetes_target == "-":
+            sys.stdout.write(yaml.dump(job))
+            sys.stdout.write("---")
+            sys.stdout.write("\n")
+        else:
+            with open(self.kubernetes_target / Path(f"{name}.yaml"), "w") as f:
+                f.write(yaml.dump(job))
+
+        return job
+
+    def job_config(self, app, tag=None):
+        tag = tag or self.tag
+        app_deployment = copy.deepcopy(self.job_template)
+        safeowner = clean(app["owner"])
+        safetitle = clean(app["title"])
+        name = f"{safeowner}-{safetitle}-job"
+
+        resources = self._resources(app)
+
+        app_deployment["metadata"]["name"] = name
+        app_deployment["spec"]["template"]["metadata"]["labels"]["app"] = name
+
+        container_config = app_deployment["spec"]["template"]["spec"]["containers"][0]
+
+        container_config.update(
+            {
+                "name": name,
+                "image": f"{self.cr}/{self.project}/{safeowner}_{safetitle}_tasks:{self.tag}",
+                "command": [
+                    "cs-job",
+                    "-t",
+                    "1234",
+                    "-a",
+                    '{"Policy": {}, "Tax Information": {}}',
+                    "-m",
+                    '{"year": 2022}',
+                ],
+                "resources": resources,
+            }
+        )
+
+        container_config["env"].append({"name": "TITLE", "value": app["title"]})
+        container_config["env"].append({"name": "OWNER", "value": app["owner"]})
+        container_config["env"].append(
+            {"name": "SIM_TIME_LIMIT", "value": str(app["sim_time_limit"])}
+        )
+        container_config["env"].append(
+            {"name": "APP_NAME", "value": f"{safeowner}_{safetitle}_tasks"}
+        )
+        self._set_secrets(app, container_config)
+
+        return app_deployment
+
+    def _resources(self, app, action=None):
         if action == "io":
             resources = {
                 "requests": {"cpu": 0.7, "memory": "0.25G"},
@@ -293,7 +360,8 @@ def main():
     parser.add_argument("--build", action="store_true")
     parser.add_argument("--test", action="store_true")
     parser.add_argument("--push", action="store_true")
-    parser.add_argument("--make-config", action="store_true")
+    parser.add_argument("--app-config", action="store_true")
+    parser.add_argument("--job-config", action="store_true")
     parser.add_argument("--base-branch", default="origin/master")
     parser.add_argument("--quiet", "-q", default=False)
     parser.add_argument("--config-out", "-o", default=None)
@@ -314,8 +382,10 @@ def main():
         publisher.test()
     if args.push:
         publisher.push()
-    if args.make_config:
-        publisher.make_config()
+    if args.app_config:
+        publisher.write_app_config()
+    if args.job_config:
+        publisher.write_job_config()
 
 
 if __name__ == "__main__":

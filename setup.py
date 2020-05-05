@@ -24,6 +24,7 @@ setuptools.setup(
         "console_scripts": [
             "cs-publish=cs_publish.publish:main",
             "cs-secrets=cs_publish.secrets:main",
+            "cs-job=cs_publish.job:main",
         ]
     },
     classifiers=[

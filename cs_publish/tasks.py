@@ -1,7 +1,8 @@
 import time
 import os
 
-from cs_publish.app import app, task_wrapper
+from cs_publish.celery import get_app
+from cs_publish.task_wrapper import celery_task_wrapper
 
 try:
     from cs_config import functions
@@ -14,19 +15,19 @@ except ImportError as ie:
 
 APP_NAME = os.environ.get("APP_NAME")
 SIM_TIME_LIMIT = os.environ.get("SIM_TIME_LIMIT")
+app = get_app()
+
 
 @app.task(
     name=f"{APP_NAME}.inputs_version", soft_time_limit=10, bind=True, acks_late=True
 )
-@task_wrapper
+@celery_task_wrapper(celery_app=app)
 def inputs_version(self):
     return {"version": functions.get_version()}
 
 
-@app.task(
-    name=f"{APP_NAME}.inputs_get", soft_time_limit=10, bind=True, acks_late=True
-)
-@task_wrapper
+@app.task(name=f"{APP_NAME}.inputs_get", soft_time_limit=10, bind=True, acks_late=True)
+@celery_task_wrapper(celery_app=app)
 def inputs_get(self, meta_param_dict):
     return functions.get_inputs(meta_param_dict)
 
@@ -34,7 +35,7 @@ def inputs_get(self, meta_param_dict):
 @app.task(
     name=f"{APP_NAME}.inputs_parse", soft_time_limit=10, bind=True, acks_late=True
 )
-@task_wrapper
+@celery_task_wrapper(celery_app=app)
 def inputs_parse(self, meta_param_dict, adjustment, errors_warnings):
     return functions.validate_inputs(meta_param_dict, adjustment, errors_warnings)
 
@@ -45,7 +46,7 @@ def inputs_parse(self, meta_param_dict, adjustment, errors_warnings):
     bind=True,
     acks_late=True,
 )
-@task_wrapper
+@celery_task_wrapper(celery_app=app)
 def sim(self, meta_param_dict, adjustment):
     if os.environ.get("DASK_SCHEDULER_ADDRESS") is not None:
         from distributed import Client
