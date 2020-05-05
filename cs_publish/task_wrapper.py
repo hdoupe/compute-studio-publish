@@ -87,12 +87,15 @@ def handle_sim_task(celery_app, task_id, func, *args, **kwargs):
 def celery_task_wrapper(celery_app):
     def _task_wrapper(func):
         @functools.wraps(func)
-        def f(task, *args, **kwargs):
+        def f(*args, **kwargs):
+            task = args[0]
             return handle_inputs_task(
                 celery_app, task.request.id, func, *args, **kwargs
             )
 
         return f
+
+    return _task_wrapper
 
 
 def kubernetes_task_wrapper(celery_app):
@@ -107,3 +110,5 @@ def kubernetes_task_wrapper(celery_app):
             return result
 
         return f
+
+    return _task_wrapper

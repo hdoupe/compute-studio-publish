@@ -14,7 +14,7 @@ def run(*args, **kwargs):
     from cs_config import functions
 
     result = functions.run_model(*args, **kwargs)
-    print("got result", result)
+    print("success")
     return result
 
 
