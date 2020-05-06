@@ -1,5 +1,6 @@
 import argparse
 import json
+import uuid
 
 from cs_publish.task_wrapper import kubernetes_task_wrapper
 from cs_publish.celery import get_app

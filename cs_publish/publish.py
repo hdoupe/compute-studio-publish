@@ -1,14 +1,18 @@
 import argparse
 import copy
 import json
-import yaml
 import os
 import sys
+import uuid
+import yaml
 from pathlib import Path
 
-from git import Repo
+import requests
+from git import Repo, InvalidGitRepositoryError
+from kubernetes import client as kclient, config as kconfig
 
-from cs_publish.utils import clean, run
+
+from cs_publish.utils import clean, run, parse_owner_title, read_github_file
 from cs_publish.secrets import Secrets
 
 TAG = os.environ.get("TAG", "")
@@ -17,7 +21,81 @@ CURR_PATH = Path(os.path.abspath(os.path.dirname(__file__)))
 BASE_PATH = CURR_PATH / ".."
 
 
-class Publisher:
+class Core:
+    cr = "gcr.io"
+
+    def __init__(self, project, tag=None, base_branch="origin/master", quiet=False):
+        self.tag = tag
+        self.project = project
+        self.base_branch = base_branch
+        self.quiet = quiet
+
+    def get_config(self, models):
+        config = {}
+        for owner_title in models:
+            owner, title = parse_owner_title(owner_title)
+            if (owner, title) in config:
+                continue
+            else:
+                config_file = (
+                    BASE_PATH / Path("config") / Path(owner) / Path(f"{title}.yaml")
+                )
+                if config_file.exists():
+                    with open(config_file, "r") as f:
+                        c = yaml.safe_load(f.read())
+                else:
+                    config_file = self.get_config_from_remote([(owner, title)])
+                config[(c["owner"], c["title"])] = c
+        if not self.quiet and config:
+            print("# Updating:")
+            print("\n#".join(f"  {o}/{t}" for o, t in config.keys()))
+        elif not self.quiet:
+            print("# No changes detected.")
+        return config
+
+    def get_config_from_diff(self):
+        try:
+            r = Repo()
+            files_with_diff = r.index.diff(r.commit(self.base_branch), paths="config")
+        except InvalidGitRepositoryError:
+            files_with_diff = []
+        config = {}
+        for config_file in files_with_diff:
+            with open(config_file.a_path, "r") as f:
+                c = yaml.safe_load(f.read())
+            config[(c["owner"], c["title"])] = c
+        return config
+
+    def get_config_from_remote(self, models):
+        config = {}
+        for owner_title in models:
+            owner, title = parse_owner_title(owner_title)
+            resp = requests.get(
+                "https://api.github.com/repos/compute-tooling/compute-studio-publish/contents/config/{owner}/{title}.yaml"
+            )
+            content = read_github_file(
+                "compute-tooling", "compute-studio", "master", f"{owner}/{title}.yaml"
+            )
+            config[(owner, title)] = yaml.safe_load(content)
+        return config
+
+    def _resources(self, app, action=None):
+        if action == "io":
+            resources = {
+                "requests": {"cpu": 0.7, "memory": "0.25G"},
+                "limits": {"cpu": 1, "memory": "0.7G"},
+            }
+        else:
+            resources = {"requests": {"memory": "1G", "cpu": 1}}
+            resources = dict(resources, **copy.deepcopy(app["resources"]))
+        return resources
+
+    def _list_secrets(self, app):
+        secret = Secrets(app["owner"], app["title"], self.project)
+        return secret.list_secrets()
+
+
+class Publisher(Core):
     """
     Build, test, and publish docker images for Compute Studio:
 
@@ -30,24 +108,20 @@ class Publisher:
 
     """
 
-    cr = "gcr.io"
     kubernetes_target = CURR_PATH / Path("..") / Path("kubernetes")
 
     def __init__(
         self,
-        tag,
         project,
+        tag,
         models=None,
         base_branch="origin/master",
         quiet=False,
         kubernetes_target=None,
     ):
-        self.tag = tag
-        self.project = project
-        self.models = models if models and models[0] else None
-        self.base_branch = base_branch
-        self.quiet = quiet
+        super().__init__(self, tag, project, models, base_branch, quiet)
 
+        self.models = models if models and models[0] else None
         self.kubernetes_target = kubernetes_target or self.kubernetes_target
 
         if self.kubernetes_target == "-":
@@ -55,7 +129,9 @@ class Publisher:
         elif not self.kubernetes_target.exists():
             os.mkdir(self.kubernetes_target)
 
-        self.config = self.get_config()
+        self.config = self.get_config_from_diff()
+        if self.models:
+            self.config.update(self.get_config(self.models))
 
         with open(
             CURR_PATH
@@ -79,38 +155,6 @@ class Publisher:
 
         self.errored = set()
 
-    def get_config(self):
-        r = Repo()
-        config = {}
-        files_with_diff = r.index.diff(r.commit(self.base_branch), paths="config")
-        for config_file in files_with_diff:
-            if config_file.a_path in (
-                "config/worker_config.dev.yaml",
-                "config/secret.yaml",
-            ):
-                continue
-            with open(config_file.a_path, "r") as f:
-                c = yaml.safe_load(f.read())
-            config[(c["owner"], c["title"])] = c
-        if self.models:
-            for owner_title in self.models:
-                owner, title = owner_title.split("/")
-                if (owner, title) in config:
-                    continue
-                else:
-                    config_file = (
-                        BASE_PATH / Path("config") / Path(owner) / Path(f"{title}.yaml")
-                    )
-                    with open(config_file, "r") as f:
-                        c = yaml.safe_load(f.read())
-                    config[(c["owner"], c["title"])] = c
-        if not self.quiet and config:
-            print("# Updating:")
-            print("\n#".join(f"  {o}/{t}" for o, t in config.keys()))
-        elif not self.quiet:
-            print("# No changes detected.")
-        return config
-
     def build(self):
         self.apply_method_to_apps(method=self.build_app_image)
 
@@ -123,9 +167,6 @@ class Publisher:
     def write_app_config(self):
         self.apply_method_to_apps(method=self.write_secrets)
         self.apply_method_to_apps(method=self._write_app_inputs_procesess)
-
-    def write_job_config(self):
-        self.apply_method_to_apps(method=self._write_job_config)
 
     def apply_method_to_apps(self, method):
         """
@@ -268,65 +309,6 @@ class Publisher:
 
         return app_deployment
 
-    def _write_job_config(self, app):
-        job = self.job_config(app)
-        safeowner = clean(app["owner"])
-        safetitle = clean(app["title"])
-        name = f"{safeowner}-{safetitle}-job"
-
-        if self.kubernetes_target == "-":
-            sys.stdout.write(yaml.dump(job))
-            sys.stdout.write("---")
-            sys.stdout.write("\n")
-        else:
-            with open(self.kubernetes_target / Path(f"{name}.yaml"), "w") as f:
-                f.write(yaml.dump(job))
-
-        return job
-
-    def job_config(self, app, tag=None):
-        tag = tag or self.tag
-        app_deployment = copy.deepcopy(self.job_template)
-        safeowner = clean(app["owner"])
-        safetitle = clean(app["title"])
-        name = f"{safeowner}-{safetitle}-job"
-
-        resources = self._resources(app)
-
-        app_deployment["metadata"]["name"] = name
-        app_deployment["spec"]["template"]["metadata"]["labels"]["app"] = name
-
-        container_config = app_deployment["spec"]["template"]["spec"]["containers"][0]
-
-        container_config.update(
-            {
-                "name": name,
-                "image": f"{self.cr}/{self.project}/{safeowner}_{safetitle}_tasks:{self.tag}",
-                "command": [
-                    "cs-job",
-                    "-t",
-                    "1234",
-                    "-a",
-                    '{"Policy": {}, "Tax Information": {}}',
-                    "-m",
-                    '{"year": 2022}',
-                ],
-                "resources": resources,
-            }
-        )
-
-        container_config["env"].append({"name": "TITLE", "value": app["title"]})
-        container_config["env"].append({"name": "OWNER", "value": app["owner"]})
-        container_config["env"].append(
-            {"name": "SIM_TIME_LIMIT", "value": str(app["sim_time_limit"])}
-        )
-        container_config["env"].append(
-            {"name": "APP_NAME", "value": f"{safeowner}_{safetitle}_tasks"}
-        )
-        self._set_secrets(app, container_config)
-
-        return app_deployment
-
     def _resources(self, app, action=None):
         if action == "io":
             resources = {
@@ -334,8 +316,7 @@ class Publisher:
                 "limits": {"cpu": 1, "memory": "0.7G"},
             }
         else:
-            resources = {"requests": {"memory": "1G", "cpu": 1}}
-            resources = dict(resources, **copy.deepcopy(app["resources"]))
+            resources = super()._resources(app)
         return resources
 
     def _set_secrets(self, app, config):
@@ -347,9 +328,84 @@ class Publisher:
                 {"name": key, "valueFrom": {"secretKeyRef": {"name": name, "key": key}}}
             )
 
-    def _list_secrets(self, app):
-        secret = Secrets(app["owner"], app["title"], self.project)
-        return secret.list_secrets()
+
+class Job(Core):
+    def __init__(self, project):
+        super().__init__(project, quiet=True)
+        self.config = {}
+        kconfig.load_kube_config()
+        self.api_client = kclient.BatchV1Api()
+        self.job = None
+
+    def env(self, owner, title, config):
+        safeowner = clean(owner)
+        safetitle = clean(title)
+        envs = [
+            kclient.V1EnvVar("OWNER", config["owner"]),
+            kclient.V1EnvVar("TITLE", config["title"]),
+            kclient.V1EnvVar("SIM_TIME_LIMIT", str(config["sim_time_limit"])),
+        ]
+
+        for secret in self._list_secrets(config):
+            envs.append(
+                kclient.V1EnvVarSource(
+                    secret_key_ref=(
+                        kclient.V1SecretKeySelector(
+                            key=secret, name=f"{safeowner}-{safetitle}-secret"
+                        )
+                    )
+                )
+            )
+        return envs
+
+    def configure(self, owner, title, tag, job_id=None):
+        if job_id is None:
+            job_id = str(uuid.uuid4())
+
+        if (owner, title) not in self.config:
+            self.config.update(self.get_config([(owner, title)]), remote=True)
+
+        config = self.config[(owner, title)]
+
+        safeowner = clean(owner)
+        safetitle = clean(title)
+        name = f"{safeowner}-{safetitle}"
+        job_name = f"{name}-{job_id}"
+        container = kclient.V1Container(
+            name=job_name,
+            image=f"{self.cr}/{self.project}/{safeowner}_{safetitle}_tasks:{tag}",
+            command=["cs-jobs", "--job-id", job_id],
+            env=self.env(owner, title, config),
+        )
+        # Create and configurate a spec section
+        template = kclient.V1PodTemplateSpec(
+            metadata=kclient.V1ObjectMeta(labels={"app": f"{name}", "job-id": job_id}),
+            spec=kclient.V1PodSpec(restart_policy="Never", containers=[container]),
+        )
+        # Create the specification of deployment
+        spec = kclient.V1JobSpec(template=template, backoff_limit=4)
+        # Instantiate the job object
+        job = kclient.V1Job(
+            api_version="batch/v1",
+            kind="Job",
+            metadata=kclient.V1ObjectMeta(name=job_name),
+            spec=spec,
+        )
+
+        if not self.quiet:
+            print(yaml.dump(job.to_dict()))
+
+        self.job = job
+
+    def create(self):
+        return self.api_client.create_namespaced_job(body=self.job, namespace="default")
+
+    def delete(self):
+        return self.api_client.delete_namespaced_job(
+            name=self.job.metadata.name,
+            namespace="default",
+            body=kclient.V1DeleteOptions(),
+        )
 
 
 def main():
@@ -361,7 +417,6 @@ def main():
     parser.add_argument("--test", action="store_true")
     parser.add_argument("--push", action="store_true")
     parser.add_argument("--app-config", action="store_true")
-    parser.add_argument("--job-config", action="store_true")
     parser.add_argument("--base-branch", default="origin/master")
     parser.add_argument("--quiet", "-q", default=False)
     parser.add_argument("--config-out", "-o", default=None)
@@ -369,8 +424,8 @@ def main():
     args = parser.parse_args()
 
     publisher = Publisher(
-        tag=args.tag,
         project=args.project,
+        tag=args.tag,
         models=args.models,
         base_branch=args.base_branch,
         quiet=args.quiet,
@@ -384,8 +439,6 @@ def main():
         publisher.push()
     if args.app_config:
         publisher.write_app_config()
-    if args.job_config:
-        publisher.write_job_config()
 
 
 if __name__ == "__main__":
