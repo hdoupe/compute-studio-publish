@@ -69,7 +69,7 @@ class Job(Core):
             job_id = str(uuid.uuid4())
 
         if (owner, title) not in self.config:
-            self.config.update(self.get_config([(owner, title)]), remote=True)
+            self.config.update(self.get_config([(owner, title)]))
 
         config = self.config[(owner, title)]
 
