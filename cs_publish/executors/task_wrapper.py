@@ -19,9 +19,6 @@ except ImportError as ie:
     pass
 
 
-OUTPUTS_VERSION = os.environ.get("OUTPUTS_VERSION")
-
-
 def handle_inputs_task(celery_app, task_id, func, *args, **kwargs):
     start = time.time()
     traceback_str = None
@@ -47,10 +44,11 @@ def handle_sim_task(celery_app, task_id, func, *args, **kwargs):
     print("sim task", celery_app, task_id, func, args, kwargs)
     start = time.time()
     traceback_str = None
-    res = {}
+    res = {"job_id": task_id}
     try:
+        print("calling func", func, args, kwargs)
         outputs = func(*args, **kwargs)
-        version = outputs.pop("version", OUTPUTS_VERSION)
+        print("got result")
         outputs = cs_storage.serialize_to_json(outputs)
         outputs = (
             celery_app.signature(
@@ -67,7 +65,7 @@ def handle_sim_task(celery_app, task_id, func, *args, **kwargs):
             {
                 "model_version": functions.get_version(),
                 "outputs": outputs,
-                "version": version,
+                "version": "v1",
             }
         )
     except Exception:
@@ -82,33 +80,3 @@ def handle_sim_task(celery_app, task_id, func, *args, **kwargs):
         res["status"] = "FAIL"
         res["traceback"] = traceback_str
     return res
-
-
-def celery_task_wrapper(celery_app):
-    def _task_wrapper(func):
-        @functools.wraps(func)
-        def f(*args, **kwargs):
-            task = args[0]
-            return handle_inputs_task(
-                celery_app, task.request.id, func, *args, **kwargs
-            )
-
-        return f
-
-    return _task_wrapper
-
-
-def kubernetes_task_wrapper(celery_app):
-    def _task_wrapper(func):
-        @functools.wraps(func)
-        def f(task, *args, **kwargs):
-            print("kubernetes wrapper", task, func, args, kwargs)
-            result = handle_sim_task(celery_app, task, func, *args, **kwargs)
-            celery_app.signature(
-                "outputs_processor.push_to_cs", args=("sim", result)
-            ).delay()
-            return result
-
-        return f
-
-    return _task_wrapper

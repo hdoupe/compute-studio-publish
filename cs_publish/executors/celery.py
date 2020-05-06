@@ -1,3 +1,4 @@
+import functools
 import os
 import re
 
@@ -6,13 +7,11 @@ from celery import Celery
 from celery.signals import task_postrun
 from celery.result import AsyncResult
 
+from cs_publish.executors.task_wrapper import handle_inputs_task
 
 CS_URL = os.environ.get("CS_URL")
 
-CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://redis-master/0")
-CELERY_RESULT_BACKEND = os.environ.get(
-    "CELERY_RESULT_BACKEND", "redis://redis-master/0"
-)
+REDIS = os.environ.get("REDIS")
 
 
 def get_task_routes():
@@ -49,7 +48,7 @@ task_routes = get_task_routes()
 
 
 def get_app():
-    app = Celery("app", broker=CELERY_BROKER_URL, backend=CELERY_RESULT_BACKEND)
+    app = Celery("app", broker=REDIS, backend=REDIS)
     app.conf.update(
         task_serializer="json",
         accept_content=["msgpack", "json"],
@@ -58,6 +57,20 @@ def get_app():
         task_acks_late=True,
     )
     return app
+
+
+def celery_task_wrapper(celery_app):
+    def _task_wrapper(func):
+        @functools.wraps(func)
+        def f(*args, **kwargs):
+            task = args[0]
+            return handle_inputs_task(
+                celery_app, task.request.id, func, *args, **kwargs
+            )
+
+        return f
+
+    return _task_wrapper
 
 
 @task_postrun.connect

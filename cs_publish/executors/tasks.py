@@ -1,8 +1,7 @@
 import time
 import os
 
-from cs_publish.celery import get_app
-from cs_publish.task_wrapper import celery_task_wrapper
+from cs_publish.executors.celery import get_app, celery_task_wrapper
 
 try:
     from cs_config import functions
