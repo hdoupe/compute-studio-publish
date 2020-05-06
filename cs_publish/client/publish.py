@@ -58,9 +58,6 @@ class Publisher(Core):
         ) as f:
             self.app_template = yaml.safe_load(f.read())
 
-        with open(BASE_PATH / Path("templates") / Path("job.template.yaml"), "r") as f:
-            self.job_template = yaml.safe_load(f.read())
-
         with open(
             BASE_PATH / Path("templates") / Path("secret.template.yaml"), "r"
         ) as f:
