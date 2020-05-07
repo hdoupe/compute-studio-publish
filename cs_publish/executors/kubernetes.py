@@ -2,9 +2,9 @@ import argparse
 import functools
 import json
 import os
-import uuid
 
 import redis
+import requests
 
 from cs_publish.executors.task_wrapper import handle_sim_task
 from cs_publish.executors.celery import get_app
@@ -28,9 +28,12 @@ def kubernetes_task_wrapper(celery_app):
             kwargs = json.loads(result.decode())
             result = handle_sim_task(celery_app, task, func, *args, **kwargs)
             print("result from handle_sim_task", result)
-            celery_app.signature(
-                "outputs_processor.push_to_cs", args=("sim", result)
-            ).delay()
+            resp = requests.post(
+                "http://outputs-processor/push/",
+                json={"task_type": "sim", "result": result},
+            )
+            assert resp.status_code == 200, f"Got code: {resp.status_code}"
+
             return result
 
         return f

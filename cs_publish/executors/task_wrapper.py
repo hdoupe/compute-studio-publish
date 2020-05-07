@@ -50,17 +50,12 @@ def handle_sim_task(celery_app, task_id, func, *args, **kwargs):
         outputs = func(*args, **kwargs)
         print("got result")
         outputs = cs_storage.serialize_to_json(outputs)
-        outputs = (
-            celery_app.signature(
-                "outputs_processor.write_to_storage", args=(task_id, outputs)
-            )
-            .delay()
-            .get(
-                # danger: by default cannot run sync tasks
-                # from within a task.
-                disable_sync_subtasks=False
-            )
+        resp = requests.post(
+            "http://outputs-processor/write/",
+            json={"task_id": task_id, "outputs": outputs},
         )
+        assert resp.status_code == 200, f"Got code: {resp.status_code}"
+        outputs = resp.json()
         res.update(
             {
                 "model_version": functions.get_version(),
