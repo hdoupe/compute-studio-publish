@@ -10,7 +10,13 @@ from cs_publish.executors.task_wrapper import handle_sim_task
 from cs_publish.executors.celery import get_app
 
 
-REDIS = os.environ.get("REDIS")
+redis_conn = dict(
+    host=os.environ.get("REDIS_HOST"),
+    port=os.environ.get("REDIS_PORT"),
+    db=os.environ.get("REDIS_DB"),
+    username="executor",
+    password=os.environ.get("REDIS_EXECUTOR_PW"),
+)
 
 
 app = get_app()
@@ -21,7 +27,7 @@ def kubernetes_task_wrapper(celery_app):
         @functools.wraps(func)
         def f(task, *args, **kwargs):
             print("kubernetes wrapper", task, func, args, kwargs)
-            with redis.Redis.from_url(REDIS) as rclient:
+            with redis.Redis(**redis_conn) as rclient:
                 result = rclient.get(task)
             if result is None:
                 raise KeyError(f"No value found for job id: {task}")

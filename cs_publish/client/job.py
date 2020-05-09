@@ -10,7 +10,13 @@ from cs_publish.utils import clean
 from cs_publish.client.core import Core
 
 
-REDIS = os.environ.get("REDIS")
+redis_conn = dict(
+    host=os.environ.get("REDIS_HOST"),
+    port=os.environ.get("REDIS_PORT"),
+    db=os.environ.get("REDIS_DB"),
+    username="scheduler",
+    password=os.environ.get("REDIS_SCHEDULER_PW"),
+)
 
 
 class Job(Core):
@@ -31,23 +37,18 @@ class Job(Core):
             kclient.V1EnvVar("OWNER", config["owner"]),
             kclient.V1EnvVar("TITLE", config["title"]),
             kclient.V1EnvVar("SIM_TIME_LIMIT", str(config["sim_time_limit"])),
-            kclient.V1EnvVar(
-                "CS_URL",
-                value_from=kclient.V1EnvVarSource(
-                    secret_key_ref=(
-                        kclient.V1SecretKeySelector(key="CS_URL", name="worker-secret")
-                    )
-                ),
-            ),
-            kclient.V1EnvVar(
-                "REDIS",
-                value_from=kclient.V1EnvVarSource(
-                    secret_key_ref=(
-                        kclient.V1SecretKeySelector(key="REDIS", name="worker-secret")
-                    )
-                ),
-            ),
         ]
+        for sec in ["CS_URL", "REDIS_HOST", "REDIS_PORT", "REDIS_EXECUTOR_PW"]:
+            envs.append(
+                kclient.V1EnvVar(
+                    sec,
+                    value_from=kclient.V1EnvVarSource(
+                        secret_key_ref=(
+                            kclient.V1SecretKeySelector(key=sec, name="worker-secret")
+                        )
+                    ),
+                )
+            )
 
         for secret in self._list_secrets(config):
             envs.append(
@@ -66,7 +67,11 @@ class Job(Core):
 
     def configure(self, owner, title, tag, job_id=None):
         if job_id is None:
-            job_id = str(uuid.uuid4())
+            job_id = "job:" + str(uuid.uuid4())
+        else:
+            job_id = str(job_id)
+            if not str(job_id).startswith("job:"):
+                job_id += "job:"
 
         if (owner, title) not in self.config:
             self.config.update(self.get_config([(owner, title)]))
@@ -110,7 +115,7 @@ class Job(Core):
         return job
 
     def save_job_kwargs(self, job_id, job_kwargs):
-        with redis.Redis.from_url(REDIS) as rclient:
+        with redis.Redis(**redis_conn) as rclient:
             rclient.set(job_id, json.dumps(job_kwargs))
 
     def create(self):
