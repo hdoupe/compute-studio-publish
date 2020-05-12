@@ -22,8 +22,9 @@ setuptools.setup(
     include_package_data=True,
     entry_points={
         "console_scripts": [
-            "cs-publish=cs_publish.publish:main",
-            "cs-secrets=cs_publish.secrets:main",
+            "cs-publish=cs_publish.client.publish:main",
+            "cs-secrets=cs_publish.client.secrets:main",
+            "cs-job=cs_publish.executors.kubernetes:main",
         ]
     },
     classifiers=[

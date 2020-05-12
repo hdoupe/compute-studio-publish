@@ -6,16 +6,11 @@ RUN  apt-get update && apt install libgl1-mesa-glx --yes
 
 RUN conda update conda
 RUN conda config --append channels conda-forge
-RUN conda install "python>=3.7" pip
+RUN conda install "python>=3.7" pip tornado dask lz4
 
 ADD requirements.txt /home
 
 WORKDIR /home
-
-# install packages here
-# install packages necessary for celery and dask.
-RUN pip install -r requirements.txt
-RUN conda install -c conda-forge lz4
 
 ARG TITLE
 ARG OWNER
@@ -45,9 +40,3 @@ COPY setup.py /home
 RUN cd /home/ && pip install -e .
 
 WORKDIR /home
-
-COPY scripts/celery_sim.sh /home
-COPY scripts/celery_io.sh /home
-
-ENV CELERY_BROKER_URL redis://redis-master/0
-ENV CELERY_RESULT_BACKEND redis://redis-master/0

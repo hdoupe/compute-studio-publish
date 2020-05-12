@@ -7,5 +7,5 @@ env:
 sim_time_limit: 100
 resources:
   limits:
-    cpu: 2500m
-    memory: 7629Mi
+    cpu: "2.5"
+    memory: "7.5G"

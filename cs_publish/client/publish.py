@@ -1,23 +1,21 @@
 import argparse
 import copy
-import json
-import yaml
 import os
 import sys
+import yaml
 from pathlib import Path
 
-from git import Repo
+from ..utils import run, clean
 
-from cs_publish.utils import clean, run
-from cs_publish.secrets import Secrets
+from .core import Core
 
 TAG = os.environ.get("TAG", "")
 PROJECT = os.environ.get("PROJECT", "cs-workers-dev")
 CURR_PATH = Path(os.path.abspath(os.path.dirname(__file__)))
-BASE_PATH = CURR_PATH / ".."
+BASE_PATH = CURR_PATH / ".." / ".."
 
 
-class Publisher:
+class Publisher(Core):
     """
     Build, test, and publish docker images for Compute Studio:
 
@@ -30,24 +28,20 @@ class Publisher:
 
     """
 
-    cr = "gcr.io"
-    kubernetes_target = CURR_PATH / Path("..") / Path("kubernetes")
+    kubernetes_target = BASE_PATH / Path("kubernetes")
 
     def __init__(
         self,
-        tag,
         project,
+        tag,
         models=None,
         base_branch="origin/master",
         quiet=False,
         kubernetes_target=None,
     ):
-        self.tag = tag
-        self.project = project
-        self.models = models if models and models[0] else None
-        self.base_branch = base_branch
-        self.quiet = quiet
+        super().__init__(project, tag, base_branch, quiet)
 
+        self.models = models if models and models[0] else None
         self.kubernetes_target = kubernetes_target or self.kubernetes_target
 
         if self.kubernetes_target == "-":
@@ -55,54 +49,21 @@ class Publisher:
         elif not self.kubernetes_target.exists():
             os.mkdir(self.kubernetes_target)
 
-        self.config = self.get_config()
+        self.config = self.get_config_from_diff()
+        if self.models:
+            self.config.update(self.get_config(self.models))
 
         with open(
-            CURR_PATH
-            / Path("..")
-            / Path("templates")
-            / Path("sc-deployment.template.yaml"),
-            "r",
+            BASE_PATH / Path("templates") / Path("sc-deployment.template.yaml"), "r"
         ) as f:
-            self.sc_template = yaml.safe_load(f.read())
+            self.app_template = yaml.safe_load(f.read())
 
         with open(
-            CURR_PATH / Path("..") / Path("templates") / Path("secret.template.yaml"),
-            "r",
+            BASE_PATH / Path("templates") / Path("secret.template.yaml"), "r"
         ) as f:
             self.secret_template = yaml.safe_load(f.read())
 
-    def get_config(self):
-        r = Repo()
-        config = {}
-        files_with_diff = r.index.diff(r.commit(self.base_branch), paths="config")
-        for config_file in files_with_diff:
-            if config_file.a_path in (
-                "config/worker_config.dev.yaml",
-                "config/secret.yaml",
-            ):
-                continue
-            with open(config_file.a_path, "r") as f:
-                c = yaml.safe_load(f.read())
-            config[(c["owner"], c["title"])] = c
-        if self.models:
-            for owner_title in self.models:
-                owner, title = owner_title.split("/")
-                if (owner, title) in config:
-                    continue
-                else:
-                    config_file = (
-                        BASE_PATH / Path("config") / Path(owner) / Path(f"{title}.yaml")
-                    )
-                    with open(config_file, "r") as f:
-                        c = yaml.safe_load(f.read())
-                    config[(c["owner"], c["title"])] = c
-        if not self.quiet and config:
-            print("# Updating:")
-            print("\n#".join(f"  {o}/{t}" for o, t in config.keys()))
-        elif not self.quiet:
-            print("# No changes detected.")
-        return config
+        self.errored = set()
 
     def build(self):
         self.apply_method_to_apps(method=self.build_app_image)
@@ -113,8 +74,9 @@ class Publisher:
     def push(self):
         self.apply_method_to_apps(method=self.push_app_image)
 
-    def make_config(self):
-        self.apply_method_to_apps(method=self.write_sc_app)
+    def write_app_config(self):
+        self.apply_method_to_apps(method=self.write_secrets)
+        self.apply_method_to_apps(method=self._write_app_inputs_procesess)
 
     def apply_method_to_apps(self, method):
         """
@@ -130,11 +92,12 @@ class Publisher:
             except Exception:
                 print(
                     f"There was an error building: "
-                    f"{app['title']}/{app['owner']}:{self.tag}"
+                    f"{app['owner']}/{app['title']}:{self.tag}"
                 )
                 import traceback as tb
 
                 tb.print_exc()
+                self.errored.add((app["owner"], app["title"]))
                 continue
 
     def build_app_image(self, app):
@@ -185,11 +148,6 @@ class Publisher:
         img_name = f"{safeowner}_{safetitle}_tasks"
         run(f"docker push {self.cr}/{self.project}/{img_name}:{self.tag}")
 
-    def write_sc_app(self, app):
-        self.write_secrets(app)
-        for action in ["io", "sim"]:
-            self._write_sc_app(app, action)
-
     def write_secrets(self, app):
         secret_config = copy.deepcopy(self.secret_template)
         safeowner = clean(app["owner"])
@@ -211,10 +169,11 @@ class Publisher:
 
         return secret_config
 
-    def _write_sc_app(self, app, action):
-        app_deployment = copy.deepcopy(self.sc_template)
+    def _write_app_inputs_procesess(self, app):
+        app_deployment = copy.deepcopy(self.app_template)
         safeowner = clean(app["owner"])
         safetitle = clean(app["title"])
+        action = "io"
         name = f"{safeowner}-{safetitle}-{action}"
 
         resources = self._resources(app, action)
@@ -246,6 +205,15 @@ class Publisher:
         container_config["env"].append(
             {"name": "APP_NAME", "value": f"{safeowner}_{safetitle}_tasks"}
         )
+        container_config["env"].append(
+            {
+                "name": "REDIS",
+                "valueFrom": {
+                    "secretKeyRef": {"name": "worker-secret", "key": "REDIS"}
+                },
+            }
+        )
+
         self._set_secrets(app, container_config)
 
         if self.kubernetes_target == "-":
@@ -260,15 +228,14 @@ class Publisher:
 
         return app_deployment
 
-    def _resources(self, app, action):
+    def _resources(self, app, action=None):
         if action == "io":
             resources = {
                 "requests": {"cpu": 0.7, "memory": "0.25G"},
                 "limits": {"cpu": 1, "memory": "0.7G"},
             }
         else:
-            resources = {"requests": {"memory": "1G", "cpu": 1}}
-            resources = dict(resources, **copy.deepcopy(app["resources"]))
+            resources = super()._resources(app)
         return resources
 
     def _set_secrets(self, app, config):
@@ -280,10 +247,6 @@ class Publisher:
                 {"name": key, "valueFrom": {"secretKeyRef": {"name": name, "key": key}}}
             )
 
-    def _list_secrets(self, app):
-        secret = Secrets(app["owner"], app["title"], self.project)
-        return secret.list_secrets()
-
 
 def main():
     parser = argparse.ArgumentParser(description="Deploy C/S compute cluster.")
@@ -293,7 +256,7 @@ def main():
     parser.add_argument("--build", action="store_true")
     parser.add_argument("--test", action="store_true")
     parser.add_argument("--push", action="store_true")
-    parser.add_argument("--make-config", action="store_true")
+    parser.add_argument("--app-config", action="store_true")
     parser.add_argument("--base-branch", default="origin/master")
     parser.add_argument("--quiet", "-q", default=False)
     parser.add_argument("--config-out", "-o", default=None)
@@ -301,8 +264,8 @@ def main():
     args = parser.parse_args()
 
     publisher = Publisher(
-        tag=args.tag,
         project=args.project,
+        tag=args.tag,
         models=args.models,
         base_branch=args.base_branch,
         quiet=args.quiet,
@@ -314,9 +277,5 @@ def main():
         publisher.test()
     if args.push:
         publisher.push()
-    if args.make_config:
-        publisher.make_config()
-
-
-if __name__ == "__main__":
-    main()
+    if args.app_config:
+        publisher.write_app_config()
