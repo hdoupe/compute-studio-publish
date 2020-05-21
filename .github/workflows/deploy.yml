@@ -53,13 +53,15 @@ jobs:
       # Configure docker to use the gcloud command-line tool as a credential helper
       - run: |
           # Set up docker to authenticate
-          gcloud auth configure-docker          
+          gcloud auth configure-docker
 
       # Apply updates to cluster
       - name: Deploy
         run: |
           gcloud container clusters get-credentials $GKE_CLUSTER --zone $GKE_ZONE --project $GKE_PROJECT
           echo "getting tag"
+          git log --no-merges 1
+          git log --no-merges -1 --pretty=%P
           export TAG=$(git log --no-merges -1 --pretty=%P)
           echo $TAG
           csw models --base-branch 'HEAD^' promote
