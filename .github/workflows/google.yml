@@ -79,7 +79,7 @@ jobs:
         run: |
           skiptest=$(git log -1 --pretty=%B | grep skip-test)
           echo $skiptest
-          if [ -z $skiptest ]; then csw models test; fi
+          if [[ -z "$skiptest" ]]; then csw models test; fi
 
       # Push Docker images to Google Container Registry
       - name: Push
