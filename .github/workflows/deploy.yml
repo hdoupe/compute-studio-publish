@@ -22,6 +22,8 @@ env:
   CS_URL: ${{ secrets.CS_URL }}
   CS_API_TOKEN: ${{ secrets.CS_API_TOKEN }}
 
+  TAG: ${{ github.sha }}
+
 jobs:
   setup-build-publish-deploy:
     name: Setup, Build, Test, Publish
@@ -30,7 +32,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - run: git fetch origin master --depth 10
+      - run: git fetch origin master --depth 2
+
+      - name: inspect hash
+        run: |
+          echo $GITHUB_SHA
+          echo $GITHUB_REF
+          git rev-parse HEAD
+          git show -s --format=%H
+          export TAG=$(git rev-parse HEAD)
+          git log -2
 
       - name: Set up Python
         uses: actions/setup-python@v1
@@ -59,11 +70,7 @@ jobs:
       - name: Deploy
         run: |
           gcloud container clusters get-credentials $GKE_CLUSTER --zone $GKE_ZONE --project $GKE_PROJECT
-          echo "getting tag"
-          git log --no-merges -1
-          git log --no-merges -1 --pretty=%P
-          export TAG=$(git log --no-merges -1 --pretty=%P)
-          echo tag $TAG
+          echo $TAG
           csw models --base-branch 'HEAD^' promote
           csw models --base-branch 'HEAD^' config -o - | kubectl apply -f -
           kubectl get pods -o wide
