@@ -90,5 +90,5 @@ jobs:
         if: github.event_name == 'push'
         run: |
           gcloud container clusters get-credentials $GKE_CLUSTER --zone $GKE_ZONE --project $GKE_PROJECT
-          csw --tag $GITHUB_SHA models --base-branch 'HEAD^' config -o - | kubectl apply -f -
+          csw models --base-branch 'HEAD^' config -o - | kubectl apply -f -
           kubectl get pods -o wide
