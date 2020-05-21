@@ -29,7 +29,7 @@ jobs:
 
       - name: inspect hash
         run: |
-          echo ${{ GITHUB_SHA }}
+          echo $GITHUB_SHA
           git rev-parse HEAD
           git show -s --format=%H
           export TAG=$(git rev-parse HEAD)
