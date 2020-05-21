@@ -61,8 +61,9 @@ jobs:
           gcloud container clusters get-credentials $GKE_CLUSTER --zone $GKE_ZONE --project $GKE_PROJECT
           echo "getting tag"
           git log --no-merges -1
+          git log --no-merges -1 --pretty=%P
           export TAG=$(git log --no-merges -1 --pretty=%P)
-          echo $TAG
+          echo tag $TAG
           csw models --base-branch 'HEAD^' promote
           csw models --base-branch 'HEAD^' config -o - | kubectl apply -f -
           kubectl get pods -o wide
