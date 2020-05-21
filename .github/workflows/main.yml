@@ -10,6 +10,7 @@ on:
 # Environment variables available to all jobs and steps in this workflow
 env:
   GITHUB_SHA: ${{ github.sha }}
+  GITHUB_REF: ${{ github.ref }}
 
   PROJECT: ${{ secrets.PROJECT }}
   CS_URL: ${{ secrets.CS_URL }}
@@ -30,6 +31,7 @@ jobs:
       - name: inspect hash
         run: |
           echo $GITHUB_SHA
+          echo $GITHUB_REF
           git rev-parse HEAD
           git show -s --format=%H
           export TAG=$(git rev-parse HEAD)
