@@ -22,8 +22,6 @@ env:
   CS_URL: ${{ secrets.CS_URL }}
   CS_API_TOKEN: ${{ secrets.CS_API_TOKEN }}
 
-  TAG: ${{ github.sha }}
-
 jobs:
   setup-build-publish-deploy:
     name: Setup, Build, Test, Publish
@@ -48,9 +46,9 @@ jobs:
       # Setup gcloud CLI
       - uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
         with:
-          version: "270.0.0"
           service_account_email: ${{ secrets.GKE_EMAIL }}
           service_account_key: ${{ secrets.GKE_KEY }}
+          export_default_credentials: true
 
       # Configure docker to use the gcloud command-line tool as a credential helper
       - run: |
@@ -62,8 +60,8 @@ jobs:
         run: |
           gcloud container clusters get-credentials $GKE_CLUSTER --zone $GKE_ZONE --project $GKE_PROJECT
           echo "getting tag"
-          TAG="$(git log --no-merges -1 --pretty=%P)"
-          echo "$TAG"
+          export TAG="$(git log --no-merges -1 --pretty=%P)"
+          echo $TAG
           csw models --base-branch 'HEAD^' promote
           csw models --base-branch 'HEAD^' config -o - | kubectl apply -f -
           kubectl get pods -o wide
