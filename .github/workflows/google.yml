@@ -28,9 +28,12 @@ env:
   PROJECT: ${{ secrets.PROJECT }}
   GKE_EMAIL: ${{ secrets.GKE_EMAIL }}
   GITHUB_SHA: ${{ github.sha }}
+  TAG: ${{ github.sha }}
   GKE_ZONE: us-central1-c
   GKE_CLUSTER: cluster-1
   REGISTRY_HOSTNAME: gcr.io
+  CS_URL: ${{ secrets.CS_URL }}
+  CS_API_TOKEN: ${{ secrets.CS_API_TOKEN }}
 
 jobs:
   setup-build-publish-deploy:
@@ -45,15 +48,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v1
         with:
-          python-version: "3.x"
+          python-version: "3.8"
 
       # Install pip and pytest
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
-          python -m pip install google-cloud-secret-manager
-          python -m pip install -e .
+          python -m pip install "git+https://github.com/compute-tooling/compute-studio.git@cluster-refactor#egg=cs-workers&subdirectory=workers"
 
       # Setup gcloud CLI
       - uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
@@ -71,23 +72,23 @@ jobs:
       # Build Docker images
       - name: Build
         run: |
-          cs-publish --tag $GITHUB_SHA --build
+          csw models build
 
       # Test Docker images
       - name: Test
         run: |
-          cs-publish --tag $GITHUB_SHA --test
+          csw models test
 
       # Push Docker images to Google Container Registry
       - name: Publish
         if: github.event_name == 'push'
         run: |
-          cs-publish --tag $GITHUB_SHA --push --base-branch 'HEAD^'
+          csw models --base-branch 'HEAD^' push
 
       # Apply updates to cluster
       - name: Deploy
         if: github.event_name == 'push'
         run: |
           gcloud container clusters get-credentials $GKE_CLUSTER --zone $GKE_ZONE --project $GKE_PROJECT
-          cs-publish --tag $GITHUB_SHA --make-config --base-branch 'HEAD^' -o - | kubectl apply -f -
+          csw --tag $GITHUB_SHA models --base-branch 'HEAD^' config -o - | kubectl apply -f -
           kubectl get pods -o wide
