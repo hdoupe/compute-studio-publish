@@ -76,19 +76,26 @@ jobs:
 
       # Test Docker images
       - name: Test
+        if: "!contains(github.event.head_commit.message, 'skip test')"
         run: |
           csw models test
 
       # Push Docker images to Google Container Registry
+      - name: Push
+        if: github.event_name != 'push'
+        run: |
+          csw models --base-branch 'HEAD^' push
+
+      # Push Docker image and set it as default image for model on Compute Studio
       - name: Publish
         if: github.event_name == 'push'
         run: |
-          csw models --base-branch 'HEAD^' push
+          csw models --base-branch 'HEAD^' push --lastest-tag
 
       # Apply updates to cluster
       - name: Deploy
         if: github.event_name == 'push'
         run: |
           gcloud container clusters get-credentials $GKE_CLUSTER --zone $GKE_ZONE --project $GKE_PROJECT
-          csw --tag $GITHUB_SHA models --base-branch 'HEAD^' config -o - | kubectl apply -f -
+          csw models --base-branch 'HEAD^' config -o - | kubectl apply -f -
           kubectl get pods -o wide
