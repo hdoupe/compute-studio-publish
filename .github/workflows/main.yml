@@ -56,4 +56,4 @@ jobs:
       # Push Docker images to GitHub container registry
       - name: Push
         run: |
-          csw models --cr 'docker.pkg.github.com' --base-branch 'HEAD^' push
+          csw models --cr 'docker.pkg.github.com' push
