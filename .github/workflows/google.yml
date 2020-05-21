@@ -77,8 +77,8 @@ jobs:
       # Test Docker images
       - name: Test
         run: |
-          skiptest=$(git log -1 --pretty=%B | grep skip-test)
-          echo $skiptest
+          skiptest="$(git log -1 --pretty=%B | grep "skip-test")"
+          echo "$skiptest"
           if [[ -z "$skiptest" ]]; then csw models test; fi
 
       # Push Docker images to Google Container Registry
