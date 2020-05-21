@@ -80,10 +80,16 @@ jobs:
           csw models test
 
       # Push Docker images to Google Container Registry
+      - name: Push
+        if: github.event_name != 'push'
+        run: |
+          csw models --base-branch 'HEAD^' push
+
+      # Push Docker image and set it as default image for model on Compute Studio
       - name: Publish
         if: github.event_name == 'push'
         run: |
-          csw models --base-branch 'HEAD^' push
+          csw models --base-branch 'HEAD^' push --lastest-tag
 
       # Apply updates to cluster
       - name: Deploy
