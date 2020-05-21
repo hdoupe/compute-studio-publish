@@ -1,0 +1,94 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "config/**"
+
+# Environment variables available to all jobs and steps in this workflow
+env:
+  GITHUB_SHA: ${{ github.sha }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}'
+
+  GKE_PROJECT: ${{ secrets.GKE_PROJECT }}
+  GKE_EMAIL: ${{ secrets.GKE_EMAIL }}
+  GKE_ZONE: us-central1-c
+  GKE_CLUSTER: cluster-1
+  REGISTRY_HOSTNAME: gcr.io
+
+  PROJECT: ${{ secrets.PROJECT }}
+  CS_URL: ${{ secrets.CS_URL }}
+  CS_API_TOKEN: ${{ secrets.CS_API_TOKEN }}
+
+  TAG: ${{ github.sha }}
+
+jobs:
+  setup-build-publish-deploy:
+    name: Setup, Build, Test, Publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - run: git fetch origin master --depth 2
+
+      - name: Set up Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: "3.8"
+
+      # Install pip and pytest
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "git+https://github.com/compute-tooling/compute-studio.git@cluster-refactor#egg=cs-workers&subdirectory=workers"
+
+      # Setup gcloud CLI
+      - uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+        with:
+          version: "270.0.0"
+          service_account_email: ${{ secrets.GKE_EMAIL }}
+          service_account_key: ${{ secrets.GKE_KEY }}
+
+      - name: Login to GH Docker Registry
+      - run: |
+          # Set up docker to authenticate
+          echo $GITHUB_TOKEN | docker login docker.pkg.github.com -u hdoupe --password-stdin
+
+      # Configure docker to use the gcloud command-line tool as a credential helper
+      - run: |
+          # Set up docker to authenticate
+          gcloud auth configure-docker
+
+      # Build Docker images
+      - name: Retag from GH images to GCR
+        run: |
+          csw models ghretag
+
+      # Test Docker images
+      - name: Test
+        if: "!contains(github.event.head_commit.message, 'skip test')"
+        run: |
+          csw models test
+
+      # Push Docker images to Google Container Registry
+      - name: Push
+        if: github.event_name != 'push'
+        run: |
+          csw models --base-branch 'HEAD^' push
+
+      # Push Docker image and set it as default image for model on Compute Studio
+      - name: Publish
+        if: github.event_name == 'push'
+        run: |
+          csw models --base-branch 'HEAD^' push --lastest-tag
+
+      # Apply updates to cluster
+      - name: Deploy
+        if: github.event_name == 'push'
+        run: |
+          gcloud container clusters get-credentials $GKE_CLUSTER --zone $GKE_ZONE --project $GKE_PROJECT
+          csw models --base-branch 'HEAD^' config -o - | kubectl apply -f -
+          kubectl get pods -o wide
