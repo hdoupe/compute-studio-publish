@@ -34,15 +34,6 @@ jobs:
 
       - run: git fetch origin master --depth 2
 
-      - name: inspect hash
-        run: |
-          echo $GITHUB_SHA
-          echo $GITHUB_REF
-          git rev-parse HEAD
-          git show -s --format=%H
-          export TAG=$(git rev-parse HEAD)
-          git log -2
-
       - name: Set up Python
         uses: actions/setup-python@v1
         with:
@@ -70,7 +61,7 @@ jobs:
       - name: Deploy
         run: |
           gcloud container clusters get-credentials $GKE_CLUSTER --zone $GKE_ZONE --project $GKE_PROJECT
-          echo $TAG
-          csw models --base-branch 'HEAD^' promote
+          latest_tag=$(csw models --base-branch 'HEAD^' promote)
+          echo $latest_tag
           csw models --base-branch 'HEAD^' config -o - | kubectl apply -f -
           kubectl get pods -o wide

@@ -28,14 +28,6 @@ jobs:
 
       - run: git fetch origin master --depth 2
 
-      - name: inspect hash
-        run: |
-          echo $GITHUB_SHA
-          echo $GITHUB_REF
-          git rev-parse HEAD
-          git show -s --format=%H
-          export TAG=$(git rev-parse HEAD)
-
       - name: Set up Python
         uses: actions/setup-python@v1
         with:
@@ -74,3 +66,9 @@ jobs:
       - name: Push
         run: |
           csw models push
+
+      # Set tag as staging.
+      - name: Stage
+        run: |
+          staging_tag=$(csw models stage $TAG)
+          echo $staging_tag
