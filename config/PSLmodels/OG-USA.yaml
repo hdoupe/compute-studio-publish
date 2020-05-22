@@ -3,7 +3,7 @@ title: OG-USA
 branch: master
 repo_url: https://github.com/PSLmodels/OG-USA
 env:
-  BUILD_NUM: 5```
+  BUILD_NUM: 6
 sim_time_limit: 20000
 resources:
   requests:
