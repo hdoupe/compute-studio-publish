@@ -7,8 +7,8 @@ env:
 sim_time_limit: 20000
 resources:
   requests:
-    cpu: "2"
-    memory: "8G"
-  limits:
     cpu: "4"
-    memory: "13G"
+    memory: "20G"
+  limits:
+    cpu: "7"
+    memory: "28G"
