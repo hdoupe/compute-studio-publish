@@ -4,7 +4,7 @@ branch: memory
 # This will install Rick's memory management branch
 repo_url: https://github.com/hdoupe/OG-USA
 env:
-  BUILD_NUM: 1
+  BUILD_NUM: 2
 sim_time_limit: 20000
 resources:
   requests:
