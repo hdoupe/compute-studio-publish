@@ -1,15 +1,8 @@
 owner: PSLmodels
 title: OG-USA
-branch: memory
-# This will install Rick's memory management branch
-repo_url: https://github.com/hdoupe/OG-USA
-env:
-  BUILD_NUM: 2
-sim_time_limit: 20000
-resources:
-  requests:
-    cpu: "4"
-    memory: "20G"
-  limits:
-    cpu: "7"
-    memory: "28G"
+repo_tag: {}
+repo_url: {}
+env: {}
+exp_task_time: null
+resources: {}
+timestamp: Sat 23 May 2020 04:41:09 PM EDT
