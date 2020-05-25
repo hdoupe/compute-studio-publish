@@ -51,7 +51,8 @@ def pub(args):
                 ref = (
                     "update-"
                     + str(now.strftime("%Y-%m-%d"))
-                    + random.randint(1111, 9999)
+                    + " "
+                    + str(random.randint(1111, 9999))
                 )
                 run(f"git checkout -b {ref}")
                 create = True
