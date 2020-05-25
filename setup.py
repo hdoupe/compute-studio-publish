@@ -16,7 +16,7 @@ setuptools.setup(
     description=("Create and update C/S Publish PRs."),
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/compute-tooling/compute-studio-workers",
+    url="https://github.com/compute-tooling/compute-studio-publish",
     packages=setuptools.find_packages(),
     install_requires=["pyyaml", "httpx"],
     include_package_data=True,
