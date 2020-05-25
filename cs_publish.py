@@ -26,7 +26,7 @@ def open_pr_ref(owner, title):
     resp = httpx.get(GH_PRS)
     assert resp.status_code == 200, f"Got code: {resp.status_code}"
     for pr in resp.json():
-        if pr["title"] == f"{owner}/{title}":
+        if f"{owner}/{title}" in pr["title"]:
             return pr["head"]["ref"]
     return None
 
@@ -51,7 +51,7 @@ def pub(args):
                 ref = (
                     "update-"
                     + str(now.strftime("%Y-%m-%d"))
-                    + " "
+                    + "-"
                     + str(random.randint(1111, 9999))
                 )
                 run(f"git checkout -b {ref}")
@@ -59,12 +59,12 @@ def pub(args):
 
             config_file_path = Path("config") / o / f"{t}.yaml"
             with open(config_file_path, "w") as f:
-                f.write(yaml.dump({"owner": o, "title": t, "timestamp": str(now)}))
+                f.write(yaml.dump({"owner": o, "title": t, "timestamp": str(now.strftime("%Y-%m-%d %H:%M"))}))
 
-            commit_message = f"Update {o}/{t} - {str(now)}"
+            commit_message = f"Update {o}/{t} - {str(now.strftime('%Y-%m-%d %H:%M'))}"
             if args.skip_test:
                 commit_message = f"[skip test] {commit_message}"
-            run(f"git add -u && git commit -m '{commit_message}'")
+            run(f"git add '{config_file_path}' && git commit -m '{commit_message}'")
 
             # same for now
             if create:
