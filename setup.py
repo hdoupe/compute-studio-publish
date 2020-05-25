@@ -13,18 +13,16 @@ setuptools.setup(
     version=os.environ.get("TAG", "0.0.0"),
     author="Hank Doupe",
     author_email="hank@compute.studio",
-    description=("Build, publish, and run Compute Studio workers."),
+    description=("Create and update C/S Publish PRs."),
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/compute-tooling/compute-studio-workers",
+    url="https://github.com/compute-tooling/compute-studio-publish",
     packages=setuptools.find_packages(),
-    install_requires=["celery", "redis", "gitpython", "pyyaml"],
+    install_requires=["pyyaml", "httpx"],
     include_package_data=True,
     entry_points={
         "console_scripts": [
-            "cs-publish=cs_publish.client.publish:main",
-            "cs-secrets=cs_publish.client.secrets:main",
-            "cs-job=cs_publish.executors.kubernetes:main",
+            "cs-publish=cs_publish:cli",
         ]
     },
     classifiers=[
