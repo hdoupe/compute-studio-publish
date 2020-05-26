@@ -12,6 +12,16 @@ Some models' test suites take too long to run on GitHub actions. After checking 
 cs-publish -n PSLmodels/OG-USA --skip-test
 ```
 
-These commands will create or update a config file with the current timestamp and push the branch to GitHub. If a PR for a given model is already open, then this tool will push the changes to the existing PR. If the tests pass, click merge pull request to deploy the model.
+These commands will create or update a config file with the current timestamp and push the branch to GitHub. If a PR for a given model is already open, then this command will push the changes to the existing PR. If the tests pass, click merge pull request to deploy the model.
+
+### Install
+
+```
+git clone https://github.com/compute-tooling/compute-studio-publish/
+cd compute-studio-publish
+pip install -e .
+
+cs-publish --help
+```
 
 **TODO:** Write technical docs.
