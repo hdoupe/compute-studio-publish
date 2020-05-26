@@ -1,6 +1,8 @@
 # compute-studio-publish
 
-Create and update models in Compute Studio:
+Create and update models in [Compute Studio](https://compute.studio):
+
+_Are you interested in publishing your model on C/S? If so, fill out the [publishing form](https://compute.studio/publish/) and the team will guide you through the process._
 
 ```bash
 cs-publish -n [:user]/[:owner]
