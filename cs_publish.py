@@ -10,6 +10,7 @@ import time
 import httpx
 import yaml
 
+CS_URL = os.environ.get("CS_URL", "https://compute.studio")
 GH_PRS = "https://api.github.com/repos/compute-tooling/compute-studio-publish/pulls?state=open"
 
 
@@ -21,6 +22,9 @@ def run(cmd):
     print(f"\n\tFinished in {f-s} seconds.\n")
     return res
 
+def exists(project_name):
+    resp = httpx.get(f"{CS_URL}/{project_name}/")
+    return resp.status_code == 200
 
 def open_pr_ref(owner, title):
     resp = httpx.get(GH_PRS)
@@ -31,7 +35,8 @@ def open_pr_ref(owner, title):
     return None
 
 
-def pub(args):
+def pub(args: argparse.Namespace):
+    assert exists(args.name), f"{args.name} does not exist on {CS_URL}."
     start = os.path.abspath(Path("."))
     try:
         with tempfile.TemporaryDirectory(prefix="update-") as td:
@@ -57,7 +62,10 @@ def pub(args):
                 run(f"git checkout -b {ref}")
                 create = True
 
-            config_file_path = Path("config") / o / f"{t}.yaml"
+            config_dir_path = Path("config") / o / f"{t}.yaml"
+            if not config_dir_path.exists():
+                os.mkdir(config_dir_path)
+            config_file_path = config_dir_path / f"{t}.yaml"
             with open(config_file_path, "w") as f:
                 f.write(yaml.dump({"owner": o, "title": t, "timestamp": str(now.strftime("%Y-%m-%d %H:%M"))}))
 
