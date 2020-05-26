@@ -62,7 +62,7 @@ def pub(args: argparse.Namespace):
                 run(f"git checkout -b {ref}")
                 create = True
 
-            config_dir_path = Path("config") / o / f"{t}.yaml"
+            config_dir_path = Path("config") / o
             if not config_dir_path.exists():
                 os.mkdir(config_dir_path)
             config_file_path = config_dir_path / f"{t}.yaml"
