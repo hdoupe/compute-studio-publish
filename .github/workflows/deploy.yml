@@ -63,5 +63,6 @@ jobs:
           gcloud container clusters get-credentials $GKE_CLUSTER --zone $GKE_ZONE --project $GKE_PROJECT
           latest_tag=$(csw models --base-branch 'HEAD^' promote)
           echo $latest_tag
+          kubectl config set-context --current --namespace=prod
           csw --tag $latest_tag models --base-branch 'HEAD^' config -o - | kubectl apply -f -
           kubectl get pods -o wide
