@@ -14,7 +14,7 @@ env:
 
   GKE_PROJECT: ${{ secrets.GKE_PROJECT }}
   GKE_EMAIL: ${{ secrets.GKE_EMAIL }}
-  GKE_ZONE: us-central1-c
+  GKE_ZONE: us-east1-b
   GKE_CLUSTER: cluster-1
   REGISTRY_HOSTNAME: gcr.io
 
