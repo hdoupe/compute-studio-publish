@@ -43,7 +43,11 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install "git+https://github.com/compute-tooling/compute-studio.git@master#egg=cs-workers&subdirectory=workers"
+          python -m pip install && \
+            "git+https://github.com/compute-tooling/compute-studio.git@master#egg=cs-secrets&subdirectory=secrets" \
+            "git+https://github.com/compute-tooling/compute-studio.git@master#egg=cs-deploy&subdirectory=deploy" \
+            "git+https://github.com/compute-tooling/compute-studio.git@master#egg=cs-workers&subdirectory=workers"
+
 
       # Setup gcloud CLI
       - uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
