@@ -57,22 +57,22 @@ jobs:
       # Build Docker images
       - name: Build
         run: |
-          csw models build
+          cs workers models build
 
       # Test Docker images
       - name: Test
         if: |
           !contains(format('{0} {1} {2}', github.event.head_commit.message, github.event.pull_request.title, github.event.pull_request.body), '[skip test]')
         run: |
-          csw models test
+          cs workers models test
 
       # Push Docker images to CR
       - name: Push
         run: |
-          csw models push
+          cs workers models push
 
       # Set tag as staging.
       - name: Stage
         run: |
-          staging_tag=$(csw models stage $TAG)
+          staging_tag=$(cs workers models stage $TAG)
           echo $staging_tag
