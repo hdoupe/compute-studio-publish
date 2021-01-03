@@ -43,7 +43,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install && \
+          python -m pip install \
             "git+https://github.com/compute-tooling/compute-studio.git@master#egg=cs-secrets&subdirectory=secrets" \
             "git+https://github.com/compute-tooling/compute-studio.git@master#egg=cs-deploy&subdirectory=deploy" \
             "git+https://github.com/compute-tooling/compute-studio.git@master#egg=cs-workers&subdirectory=workers"
@@ -65,7 +65,7 @@ jobs:
       - name: Deploy
         run: |
           gcloud container clusters get-credentials $GKE_CLUSTER --zone $GKE_ZONE --project $GKE_PROJECT
-          latest_tag=$(csw models --base-branch 'HEAD^' promote)
+          latest_tag=$(cs workers models --base-branch 'HEAD^' promote)
           echo $latest_tag
-          csw --tag $latest_tag models --base-branch 'HEAD^' config -o - | kubectl apply -f -
+          cs workers --tag $latest_tag models --base-branch 'HEAD^' config -o - | kubectl apply -f -
           kubectl get pods -o wide
